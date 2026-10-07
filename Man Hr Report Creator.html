@@ -38,6 +38,12 @@ td.c{width:46px;min-width:46px}
 td.c.wk{background:var(--wk)}
 td.c input{width:100%;height:30px;border:0;background:transparent;text-align:center;padding:0;-moz-appearance:textfield}
 td.c input::-webkit-inner-spin-button{display:none}
+thead th.hol{background:#4b5563}
+thead th.leave{background:#d6336c}
+thead tr.dtype th{background:var(--task2);color:var(--ink);padding:2px;position:static;font-weight:400}
+thead tr.dtype select{width:100%;min-width:58px;font-size:11px;border:0;background:transparent;color:var(--ink);padding:2px 0}
+td.c.hol:not(.has){background:#a9afb7}
+td.c.leave:not(.has){background:#ffc2d6}
 td.c.has.e{background:var(--est)}
 td.c.has.l{background:var(--log)}
 td.c.has input{color:#fff;font-weight:600}
@@ -59,27 +65,34 @@ tfoot td{background:var(--task2);font-weight:600;padding:5px 6px}
 .chip{display:inline-flex;align-items:center;gap:4px;background:var(--task2);border-radius:14px;padding:3px 4px 3px 10px}
 .chip button{border:0;background:none;padding:0 6px;color:var(--mute);cursor:pointer}
 #grid select.tg{border:0;background:transparent;font:inherit;color:var(--ink);padding:4px;max-width:120px}
+.bar label.chk{flex-direction:row;align-items:center;gap:4px;font-size:13px;color:var(--ink)}
 .hint{color:var(--mute)}
 .mini{width:100%;border-collapse:collapse}
 .mini th,.mini td{padding:5px 10px;text-align:left;border:1px solid var(--line)}
 .mini th{background:var(--head);color:#fff}
 #sheet td.c.has{color:#fff;font-weight:600}
 #sheet td.c{padding:5px 4px}
-#v-sheet .wrap{background:#fff;color:#000}
-#sheet{width:100%;font-family:"Times New Roman","Hiragino Mincho ProN","Yu Mincho",serif;color:#000}
-#sheet thead th{background:#fff;color:#000;position:static;border:1px solid #000;padding:6px 4px;font-size:12px;font-weight:700}
-#sheet td,#sheet tfoot td{border:0;border-bottom:1px dotted #444;border-right:1px dotted #444;padding:2px 4px;height:26px;background:#fff;font-weight:400;color:#000}
-#sheet td:first-child{text-align:left;padding-left:8px;white-space:nowrap}
-#sheet tr.sat td{background:#ccffcc}
-#sheet tr.sun td{background:#ffff99}
-#sheet tr.hol td{background:#ffb3b3}
-#sheet input{border:0;background:transparent;font:inherit;color:#000;text-align:center;width:100%;padding:2px}
-#sheet caption{caption-side:top;text-align:left;font-weight:700;padding:8px;font-size:14px}
-#sheet select{border:0;background:transparent;font:inherit;color:#000;width:112px}
-.rmw{display:flex;gap:4px}.rmw input{flex:1}
+#sheet{width:100%;color:var(--ink)}
+#sheet caption{caption-side:top;text-align:left;font-weight:700;padding:8px;font-size:14px;color:var(--ink)}
+#sheet thead th{background:var(--head);color:#fff;border:1px solid var(--line);padding:6px 4px;font-size:12px;font-weight:600;position:static}
+#sheet td{border:1px solid var(--line);padding:2px 4px;height:28px;background:var(--panel);color:var(--ink);text-align:center}
+#sheet td:first-child{text-align:left;padding-left:8px;white-space:nowrap;background:var(--task);font-weight:600}
+#sheet tr.sat td,#sheet tr.sun td{background:var(--wk)}
+#sheet tr.hol td{background:#b9bfc7;color:#000}
+#sheet tr.leave td{background:#ffc2d6;color:#000}
+#sheet input,#sheet select{border:0;background:transparent;font:inherit;color:inherit;text-align:center;width:100%;padding:2px}
+#sheet select{width:112px}
+.rmw{display:flex;gap:4px}.rmw input{flex:1;text-align:left}
 #sheet td.rm{text-align:left;min-width:200px}
-#sheet td.rm input{text-align:left}
-#sheet tfoot td{font-weight:700;border-top:1px solid #000}
+#sheet tfoot td{background:var(--task2);font-weight:600}
+table.rep{width:100%;color:var(--ink)}
+table.rep caption{caption-side:top;text-align:left;font-weight:700;padding:8px;font-size:14px}
+table.rep thead th{background:var(--head);color:#fff;border:1px solid var(--line);padding:6px 4px;font-size:12px;font-weight:600;position:static;white-space:normal}
+table.rep td{border:1px solid var(--line);padding:2px 6px;height:28px;background:var(--panel);text-align:center}
+table.rep td.l{text-align:left}
+table.rep tr.np td{background:var(--task2)}
+table.rep input{border:0;background:transparent;font:inherit;color:inherit;text-align:center;width:100%;min-width:52px;padding:2px}
+table.rep tfoot td{background:var(--task2);font-weight:600}
 @media print{.tabs,.bar,.add,#msg,header p{display:none}.wrap{margin:0;border:0}body{background:#fff;color:#000}}
 #msg{padding:0 20px;color:var(--mute);min-height:20px}
 </style>
@@ -93,6 +106,7 @@ tfoot td{background:var(--task2);font-weight:600;padding:5px 6px}
 <nav class="tabs">
   <button id="t-tracker" class="on">Tracker</button>
   <button id="t-sheet">Timesheet</button>
+  <button id="t-weekly">Weekly report</button>
   <button id="t-lists">Lists</button>
 </nav>
 <div class="bar" id="pbar"><label>Month (period)<select id="pm" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)"></select></label><label>Year<input type="number" id="py" style="width:90px"></label><span id="plabel" class="hint" style="padding-bottom:8px"></span></div>
@@ -109,6 +123,15 @@ tfoot td{background:var(--task2);font-weight:600;padding:5px 6px}
 </div>
 <div id="msg" role="status"></div>
 
+<div class="bar" id="bulk">
+  <label>Set day type for many dates<select id="bt" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)"></select></label>
+  <label>From<input type="date" id="bf"></label><label>To<input type="date" id="bto"></label>
+  <span id="bdows" style="display:flex;gap:8px;align-items:center;padding-bottom:6px">
+    <label class="chk"><input type="checkbox" data-dow="1" checked>Mon</label><label class="chk"><input type="checkbox" data-dow="2" checked>Tue</label><label class="chk"><input type="checkbox" data-dow="3" checked>Wed</label><label class="chk"><input type="checkbox" data-dow="4" checked>Thu</label><label class="chk"><input type="checkbox" data-dow="5" checked>Fri</label><label class="chk"><input type="checkbox" data-dow="6">Sat</label><label class="chk"><input type="checkbox" data-dow="0">Sun</label>
+  </span>
+  <label class="chk" style="padding-bottom:6px"><input type="checkbox" id="bov">Overwrite existing</label>
+  <button id="bapply" class="primary">Apply</button><button id="bclear">Clear</button>
+</div>
 <div class="wrap"><table id="grid"></table></div>
 <div class="lists" id="tsum"></div>
 
@@ -123,8 +146,14 @@ tfoot td{background:var(--task2);font-weight:600;padding:5px 6px}
 </section>
 
 <section id="v-sheet" hidden>
-  <div class="bar"><label>Name<input type="text" id="tsname" placeholder="Employee name" style="width:180px"></label><label>From<input type="date" id="tsfrom"></label><label>To<input type="date" id="tsto"></label><label>Regular hours per day<input type="number" id="reg" step="0.25" min="0" style="width:90px"></label><span class="sp"></span><button id="sx">Export timesheet</button><button id="sprint">Print</button></div>
+  <div class="bar"><label>Name<input type="text" id="tsname" placeholder="Employee name" style="width:180px"></label><label>From<input type="date" id="tsfrom"></label><label>To<input type="date" id="tsto"></label><label>Regular hours per day<input type="number" id="reg" step="0.25" min="0" style="width:90px"></label><span class="sp"></span><input type="file" id="sfile" accept=".xlsx,.xls,.xlsm,.csv" hidden><button id="simp" class="primary">Import timesheet</button><button id="sx">Export timesheet</button><button id="sprint">Print</button></div>
   <div class="wrap"><table id="sheet"></table></div>
+</section>
+
+<section id="v-weekly" hidden>
+  <div class="bar"><label>Week starting<input type="date" id="wkdate"></label><button id="wkprev">◀ Prev week</button><button id="wknext">Next week ▶</button><span class="sp"></span><button id="wkx">Export weekly report</button><button id="wkprint">Print</button></div>
+  <div class="wrap"><table id="weekly" class="rep"></table></div>
+  <div class="hint" style="padding:0 20px 20px">Job No. = 7-digit job code from the project name – scope-of-work code – A (Revision), D (Creation) or C (Checking). A “?” means something is missing: the project name needs a 7-digit code, the task must be one of the scope-of-work names, or the description must be Revision, Creation or Checking. Output Product is the project name and Work Description is the scope of work. Vacation Leave, Sick Leave and Official Business/Undertime fall under TM Concerns; their grey placeholders are filled from days marked VL, SL or OB (regular hours per day), and you can overtype them.</div>
 </section>
 
 <section id="v-lists" hidden>
@@ -132,7 +161,7 @@ tfoot td{background:var(--task2);font-weight:600;padding:5px 6px}
     <div class="card"><h2>Projects</h2><div class="row"><input id="li-projects" placeholder="New project"><button data-add="projects" class="primary">Add</button></div><div class="chips" id="ch-projects"></div></div>
     <div class="card"><h2>Task names</h2><div class="row"><input id="li-tasks" placeholder="New task name"><button data-add="tasks" class="primary">Add</button></div><div class="chips" id="ch-tasks"></div></div>
     <div class="card"><h2>Descriptions</h2><div class="row"><input id="li-descs" placeholder="New description"><button data-add="descs" class="primary">Add</button></div><div class="chips" id="ch-descs"></div></div>
-    <div class="card"><h2>Timesheet day types (Holiday dropdown)</h2><div class="row"><input id="li-holidays" placeholder="New day type"><button data-add="holidays" class="primary">Add</button></div><div class="chips" id="ch-holidays"></div></div>
+    <div class="card"><h2>Day types (Tracker and Timesheet dropdown)</h2><div class="row"><input id="li-holidays" placeholder="New day type"><button data-add="holidays" class="primary">Add</button></div><div class="chips" id="ch-holidays"></div></div>
     <div class="card"><h2>Targets</h2><div class="row"><input id="li-targets" placeholder="New target (e.g. Target 4)"><button data-add="targets" class="primary">Add</button></div><div class="chips" id="ch-targets"></div></div>
   </div>
 </section>
@@ -151,11 +180,20 @@ function say(t){$("msg").textContent=t}
 function num(v){var n=parseFloat(v);return isNaN(n)?0:n}
 function fmt(n){return n?(Math.round(n*100)/100):""}
 
-function render(){renderTargets();fillSelects();renderLists();renderSheet();
+function render(){
+  if(S.dates.length){var a=$("bf").value,b=$("bto").value,f0=S.dates[0],l0=S.dates[S.dates.length-1];
+    if(!a||a<f0||a>l0)$("bf").value=f0;if(!b||b<f0||b>l0)$("bto").value=l0}renderTargets();fillSelects();renderLists();renderSheet();renderWeekly();
   var g=$("grid"),h="<thead><tr><th>Project</th><th>Task</th><th>Description</th><th>Target</th><th></th>";
   S.dates.forEach(function(s){var d=parseIso(s),w=d.getDay()%6===0;
-    h+='<th class="'+(w?"wk":"")+'">'+(d.getMonth()+1)+"/"+d.getDate()+"<small>"+"SMTWTFS"[d.getDay()]+"</small></th>"});
-  h+="<th>Total</th><th></th></tr></thead><tbody>";
+    h+='<th class="'+(dayCls(s)||(w?"wk":""))+'"'+(dayCls(s)?' title="'+esc((S.ts[s]||{}).h||"")+'"':"")+'>'+(d.getMonth()+1)+"/"+d.getDate()+"<small>"+"SMTWTFS"[d.getDay()]+"</small></th>"});
+  h+="<th>Total</th><th></th></tr>";
+  h+='<tr class="dtype"><th colspan="5" style="text-align:left">Day type</th>';
+  S.dates.forEach(function(s){
+    var cur=(S.ts[s]||{}).h||"";
+    var opts='<option value="">—</option>'+S.lists.holidays.map(function(x){return"<option"+(x===cur?" selected":"")+">"+esc(x)+"</option>"}).join("");
+    if(cur&&S.lists.holidays.indexOf(cur)<0)opts+="<option selected>"+esc(cur)+"</option>";
+    h+='<th><select data-dt="'+s+'" aria-label="Day type '+s+'">'+opts+"</select></th>"});
+  h+="<th></th><th></th></tr></thead><tbody>";
   if(!S.items.length){g.innerHTML=h+'<tr><td colspan="'+(S.dates.length+7)+'" class="empty">No tasks yet. Add one below or import your Excel file.</td></tr></tbody>';return}
   S.items.forEach(function(it,i){
     ["est","log"].forEach(function(k,r){
@@ -165,7 +203,7 @@ function render(){renderTargets();fillSelects();renderLists();renderSheet();
       h+='<td class="type">'+(k==="est"?"Estimated Time":"Logged Time")+"</td>";
       S.dates.forEach(function(s){
         var v=it[k][s],w=parseIso(s).getDay()%6===0;tot+=num(v);
-        h+='<td class="c '+(w?"wk ":"")+(v?"has ":"")+(k==="est"?"e":"l")+'"><input type="number" step="0.5" min="0" data-i="'+i+'" data-k="'+k+'" data-d="'+s+'" value="'+(v||"")+'" aria-label="'+k+" "+s+'"></td>'});
+        h+='<td class="c '+dayCls(s)+" "+(w?"wk ":"")+(v?"has ":"")+(k==="est"?"e":"l")+'"><input type="number" step="0.5" min="0" data-i="'+i+'" data-k="'+k+'" data-d="'+s+'" value="'+(v||"")+'" aria-label="'+k+" "+s+'"></td>'});
       h+='<td class="tot">'+fmt(tot)+"</td>";
       if(!r)h+='<td rowspan="2"><button class="del" data-del="'+i+'" title="Delete task">✕</button></td>';
       h+="</tr>"});
@@ -269,13 +307,20 @@ function ensureLists(){
   var fresh=!S.lists;S.lists=S.lists||{};S.ts=S.ts||{};S.reg=S.reg||7.5;
   ["projects","tasks","descs"].forEach(function(k){S.lists[k]=S.lists[k]||[]});
   if(fresh)S.lists.descs=["Checking","Revision"];
-  S.lists.holidays=S.lists.holidays||["Holiday","Paid leave","Sick leave","Absent"];
+  var DT=["WFO","WFH","On Site","OB","VL","SL","Holiday"];
+  S.lists.holidays=S.lists.holidays||DT.slice();
+  if(!S.dtv2){
+    if(S.lists.holidays.join()==="Holiday,Paid leave,Sick leave,Absent")S.lists.holidays=DT.slice();
+    DT.forEach(function(x){if(S.lists.holidays.indexOf(x)<0)S.lists.holidays.push(x)});
+    S.dtv2=1}
+  if(!S.scopev1){SCOPE.forEach(function(x){if(S.lists.tasks.indexOf(x[0])<0)S.lists.tasks.push(x[0])});
+    if(S.lists.descs.indexOf("Creation")<0)S.lists.descs.push("Creation");S.scopev1=1}
   S.lists.targets=S.lists.targets||["Target 1","Target 2","Target 3"];
   var add=function(k,v){if(v&&S.lists[k].indexOf(v)<0)S.lists[k].push(v)};
   S.items.forEach(function(it){add("projects",it.project);add("tasks",it.task);add("descs",it.desc);add("targets",it.target)});
 }
 function fillSelects(){
-  [["np","projects","Project"],["nt","tasks","Task"],["nd","descs","Description"],["ng","targets","Target"]].forEach(function(x){
+  [["np","projects","Project"],["nt","tasks","Task"],["nd","descs","Description"],["ng","targets","Target"],["bt","holidays","Day type"]].forEach(function(x){
     var el=$(x[0]),cur=el.value;
     el.innerHTML='<option value="">'+x[2]+'…</option>'+S.lists[x[1]].map(function(v){return"<option>"+esc(v)+"</option>"}).join("");
     el.value=cur});
@@ -294,8 +339,8 @@ $("v-lists").addEventListener("click",function(e){
 });
 $("v-lists").addEventListener("keydown",function(e){
   if(e.key==="Enter"&&e.target.id.indexOf("li-")===0)document.querySelector('[data-add="'+e.target.id.slice(3)+'"]').click()});
-function tab(n){["tracker","sheet","lists"].forEach(function(k){$("v-"+k).hidden=k!==n;$("t-"+k).classList.toggle("on",k===n)});say("")}
-["tracker","sheet","lists"].forEach(function(k){$("t-"+k).onclick=function(){tab(k)}});
+function tab(n){["tracker","sheet","weekly","lists"].forEach(function(k){$("v-"+k).hidden=k!==n;$("t-"+k).classList.toggle("on",k===n)});say("")}
+["tracker","sheet","weekly","lists"].forEach(function(k){$("t-"+k).onclick=function(){tab(k)}});
 $("golists").onclick=function(){tab("lists")};
 $("sprint").onclick=function(){window.print()};
 function calc(s){
@@ -312,7 +357,7 @@ $("sx").onclick=function(){
   XLSX.writeFile(wb,"timesheet-"+iso(new Date())+".xlsx")};
 $("sheet").addEventListener("change",function(e){
   var t=e.target;if(!t.dataset.f)return;
-  var o=S.ts[t.dataset.d]=S.ts[t.dataset.d]||{};o[t.dataset.f]=t.value;save();renderSheet()});
+  var o=S.ts[t.dataset.d]=S.ts[t.dataset.d]||{};o[t.dataset.f]=t.value;save();render()});
 function tsDates(){
   var a=S.tsFrom||S.dates[0],b=S.tsTo||S.dates[S.dates.length-1];
   if(!a||!b)return[];
@@ -333,7 +378,7 @@ function renderSheet(){
   dts.forEach(function(s){
     var d=parseIso(s),wd=d.getDay(),c=calc(s),t=c.t;
     if(c.w!==null){tw+=c.w;te+=c.e}
-    h+='<tr class="'+(/holiday/i.test(t.h||"")?"hol":wd===6?"sat":wd===0?"sun":"")+'"><td>'+String(d.getDate()).padStart(2,"0")+"（"+jp[wd]+"）</td>"
+    h+='<tr class="'+(dayCls(s)||(wd===6?"sat":wd===0?"sun":""))+'"><td>'+String(d.getDate()).padStart(2,"0")+"（"+jp[wd]+"）</td>"
      +"<td>"+inp(s,"s","time",t.s)+"</td><td>"+inp(s,"e","time",t.e)+"</td>"
      +"<td>"+(c.a!==null?inp(s,"b","number",c.br,' step="0.25" min="0" style="width:52px"')+" hr":"")+"</td>"
      +"<td>"+(c.w===null?"":c.w.toFixed(2)+" hrs")+"</td>"
@@ -341,6 +386,13 @@ function renderSheet(){
      +'<td class="rm"><div class="rmw"><select data-d="'+s+'" data-f="h" aria-label="Day type">'+hopts(t.h)+"</select>"+inp(s,"r","text",t.r)+"</div></td></tr>"});
   $("sheet").innerHTML=h+'</tbody><tfoot><tr><td>TOTAL</td><td></td><td></td><td></td><td>'+tw.toFixed(2)+" hrs</td><td>"+te.toFixed(2)+"</td><td>"+te.toFixed(2)+"</td><td></td></tr></tfoot>";
 }
+$("grid").addEventListener("change",function(e){
+  var t=e.target;if(t.dataset.dt===undefined)return;
+  var o=S.ts[t.dataset.dt]=S.ts[t.dataset.dt]||{};
+  o.h=t.value;
+  save();render()});
+function dayCls(s){var h=((S.ts&&S.ts[s]&&S.ts[s].h)||"").trim();return/holiday/i.test(h)?"hol":/^(vl|sl)$/i.test(h)?"leave":""}
+function isHol(s){return/holiday/i.test((S.ts&&S.ts[s]&&S.ts[s].h)||"")}
 function topts(v){return'<option value=""></option>'+S.lists.targets.map(function(x){return"<option"+(x===v?" selected":"")+">"+esc(x)+"</option>"}).join("")}
 $("grid").addEventListener("change",function(e){
   var t=e.target;if(t.dataset.tg===undefined)return;
@@ -383,6 +435,135 @@ function buildPeriod(){
   pLabel();
   if(!S.dates.length)applyPeriod()}
 $("pm").onchange=applyPeriod;$("py").onchange=applyPeriod;
+function p2(n){return String(n).padStart(2,"0")}
+function parseTime(c){
+  if(c==null||c==="")return null;var t=String(c).trim(),m=/^(\d{1,2}):(\d{2})/.exec(t);
+  if(m)return p2(+m[1])+":"+m[2];
+  var n=parseFloat(t);
+  if(!isNaN(n)&&n>0&&n<1){var mi=Math.round(n*1440);return p2(Math.floor(mi/60))+":"+p2(mi%60)}
+  return null}
+function parseBreak(c){
+  if(c==null||c==="")return null;var t=String(c).trim(),m=/^(\d{1,2}):(\d{2})/.exec(t);
+  if(m)return Math.round((+m[1]+ +m[2]/60)*100)/100;
+  var n=parseFloat(t);if(isNaN(n)||n<0)return null;
+  return Math.round((n<1?n*24:n)*100)/100}
+function dateOf(c,dates,from){
+  if(c==null||c==="")return null;var m,i;
+  if(typeof c==="number"&&c>30000){var d=new Date(Math.round((c-25569)*86400e3));return d.getUTCFullYear()+"-"+p2(d.getUTCMonth()+1)+"-"+p2(d.getUTCDate())}
+  var t=String(c).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(t))return t.slice(0,10);
+  if((m=/^(\d{1,2})\s*[\/-]\s*(\d{1,2})/.exec(t))){
+    for(i=0;i<dates.length;i++){var x=parseIso(dates[i]);if(x.getMonth()+1===+m[1]&&x.getDate()===+m[2])return dates[i]}
+    return (dates[0]||iso(new Date())).slice(0,4)+"-"+p2(+m[1])+"-"+p2(+m[2])}
+  if((m=/^(\d{1,2})(?:\D|$)/.exec(t))){
+    for(i=from;i<dates.length;i++)if(parseIso(dates[i]).getDate()===+m[1])return dates[i]}
+  return null}
+function importSheet(wb){
+  var ws=wb.Sheets[wb.SheetNames[0]];
+  var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  var nz=function(c){return String(c==null?"":c).toLowerCase().replace(/\s+/g,"")};
+  var hi=rows.findIndex(function(r){return r.some(function(c){return nz(c)==="date"})&&r.some(function(c){return nz(c).indexOf("starting")===0})});
+  if(hi<0)return say("No header row found. Keep the columns: DATE, STARTING TIME, CLOSING TIME, BREAK TIME, REMARK.");
+  var hr=rows[hi],col=function(p){return hr.findIndex(function(c){return nz(c).indexOf(p)===0})};
+  var dc=hr.findIndex(function(c){return nz(c)==="date"}),sc=col("starting"),ec=col("closing"),bc=col("break"),rc=col("remark");
+  rows.slice(0,hi).forEach(function(r){if(nz(r[0])==="name"&&r[1])S.tsName=String(r[1]).trim()});
+  var dates=tsDates(),last=0,n=0,seen=[];
+  rows.slice(hi+1).forEach(function(r){
+    var d=dateOf(r[dc],dates,last);if(!d)return;
+    var ix=dates.indexOf(d);if(ix>=0)last=ix+1;
+    var st=parseTime(r[sc]),en=parseTime(r[ec]),b=bc>=0?parseBreak(r[bc]):null;
+    var rm=rc>=0&&r[rc]!=null?String(r[rc]).trim():"";
+    if(!st&&!en&&!rm)return;
+    var o=S.ts[d]=S.ts[d]||{};
+    if(st)o.s=st;if(en)o.e=en;if(b!==null&&st)o.b=b;
+    if(rm){var hit=S.lists.holidays.filter(function(x){return x.toLowerCase()===rm.toLowerCase()})[0];if(hit)o.h=hit;else o.r=rm}
+    seen.push(d);n++});
+  if(seen.length){seen.sort();
+    if(!S.tsFrom||seen[0]<S.tsFrom)S.tsFrom=seen[0];
+    if(!S.tsTo||seen[seen.length-1]>S.tsTo)S.tsTo=seen[seen.length-1]}
+  save();render();say(n?"Imported timesheet entries for "+n+" days.":"No matching dates found. Check the From/To range matches the file.")}
+$("simp").onclick=function(){$("sfile").click()};
+$("sfile").onchange=function(e){
+  var f=e.target.files[0];if(!f)return;var r=new FileReader();
+  r.onload=function(){try{importSheet(XLSX.read(r.result,{type:"array"}))}catch(err){say("Could not read that file: "+err.message)}};
+  r.readAsArrayBuffer(f);e.target.value=""};
+var SCOPE=[["Equipment Modeling",1],["Pipe Modeling",2],["Pipe Support Modeling",2],["Structure Modeling",3],["Floor Modeling",3],["Equipment Layout",4],["Foundation Layout",4],["Piping Layout",4],["Pipe Support Layout",4],["Spool Drawings",4],["Spool Detail",4],["Support Detail Drawings",4],["P&ID/ Flowsheet",4],["2D-CAD Work",5],["Other 3D Work",6],["Others",7]];
+var CATS=[["adm","Administrative<br>(義務管理)","Administrative (義務管理)"],["meet","Meeting<br>(会議)","Meeting (会議)"],["jp","Japanese<br>(日本語)","Japanese (日本語)"],["rep","Report","Report"],["sem","Seminar","Seminar"],["cof","Coffee Break","Coffee Break"],["vl","Vacation Leave","Vacation Leave"],["sl","Sick Leave","Sick Leave"],["ob","Official<br>Business/Undertime","Official Business/Undertime"]];
+function nrm(t){return String(t||"").toLowerCase().replace(/\s+/g,"")}
+function scopeCode(task){var k=nrm(task);for(var i=0;i<SCOPE.length;i++)if(nrm(SCOPE[i][0])===k)return SCOPE[i][1];return null}
+function jobNo(it){
+  var m=/\d{7}/.exec(it.project||""),c=scopeCode(it.task),d=String(it.desc||"");
+  var L=/^rev/i.test(d)?"A":/^(cre|new)/i.test(d)?"D":/^che/i.test(d)?"C":"?";
+  return (m?m[0]:"???????")+"-"+(c==null?"?":c)+L}
+function defWeek(){var d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d)}
+function wkModel(){
+  var ws=S.wkStart||defWeek(),days=mkRange(ws,7),m=(S.wk&&S.wk[ws])||{},g={},order=[];
+  S.items.forEach(function(it){
+    var h=0;days.forEach(function(d){h+=num(it.log[d])});if(!h)return;
+    var k=[it.project,it.task,it.desc].join("\u0001");
+    if(!g[k]){g[k]={out:it.project||"",job:jobNo(it),desc:it.task||"",h:0};order.push(g[k])}
+    g[k].h+=h});
+  var auto={vl:0,sl:0,ob:0},cat={},tot=0;
+  days.forEach(function(d){var t=((S.ts[d]||{}).h||"").trim().toLowerCase();if(t==="vl"||t==="vacation leave")auto.vl+=num(S.reg);if(t==="sl"||t==="sick leave")auto.sl+=num(S.reg);if(t==="ob"||t==="official business")auto.ob+=num(S.reg)});
+  CATS.forEach(function(c){cat[c[0]]=m[c[0]]!==undefined?m[c[0]]:(auto[c[0]]||0)});
+  order.forEach(function(r){tot+=r.h});
+  return{ws:ws,days:days,m:m,rows:order,auto:auto,cat:cat,tot:tot}}
+function renderWeekly(){
+  var w=wkModel();setv("wkdate",w.ws);
+  var N=CATS.slice(0,6),TM=CATS.slice(6);
+  var h="<caption>NAME: "+esc(S.tsName||"")+"&nbsp;&nbsp;&nbsp;&nbsp;WEEK: "+w.ws+" – "+w.days[6]+'</caption><thead><tr><th rowspan="2">Output Product</th><th rowspan="2">Job No.</th><th rowspan="2">Work Description</th><th rowspan="2">Consumed<br>Manhour</th>';
+  N.forEach(function(c){h+='<th rowspan="2">'+c[1]+"</th>"});
+  h+='<th colspan="3">TM Concerns</th></tr><tr>';
+  TM.forEach(function(c){h+="<th>"+c[1]+"</th>"});
+  h+="</tr></thead><tbody>";
+  var n=Math.max(12,w.rows.length),pad=new Array(CATS.length+1).join("<td></td>");
+  for(var i=0;i<n;i++){var r=w.rows[i];
+    h+=r?'<tr><td class="l">'+esc(r.out)+"</td><td>"+esc(r.job)+'</td><td class="l">'+esc(r.desc)+"</td><td>"+fmt(r.h)+"</td>"+pad+"</tr>":"<tr><td></td><td></td><td></td><td></td>"+pad+"</tr>"}
+  h+='<tr class="np"><td class="l" colspan="3"><b>Non-project time (hours for the week)</b></td><td></td>';
+  CATS.forEach(function(c){var k=c[0],v=w.m[k],au=w.auto[k];
+    h+='<td><input type="number" step="0.5" min="0" data-wk="'+k+'" value="'+(v!==undefined?v:"")+'" placeholder="'+(au?au:"")+'" aria-label="'+c[2]+'"></td>'});
+  var all=w.tot,ft='<tr><td colspan="3" style="text-align:left">TOTAL</td><td>'+fmt(w.tot)+"</td>",tm=0;
+  CATS.forEach(function(c,i){all+=w.cat[c[0]];if(i>=6)tm+=w.cat[c[0]];ft+="<td>"+fmt(w.cat[c[0]])+"</td>"});
+  $("weekly").innerHTML=h+"</tr></tbody><tfoot>"+ft+'</tr><tr><td colspan="10" style="text-align:left">TM CONCERNS TOTAL (VL + SL + OB)</td><td colspan="3">'+fmt(tm)+'</td></tr><tr><td colspan="3" style="text-align:left">GRAND TOTAL (hours)</td><td colspan="10">'+fmt(all)+"</td></tr></tfoot>"}
+$("weekly").addEventListener("change",function(e){
+  var t=e.target;if(!t.dataset.wk)return;
+  var ws=S.wkStart||defWeek();S.wk=S.wk||{};var o=S.wk[ws]=S.wk[ws]||{};
+  if(t.value==="")delete o[t.dataset.wk];else o[t.dataset.wk]=num(t.value);
+  save();render()});
+$("wkdate").onchange=function(){if(this.value){S.wkStart=this.value;save();render()}};
+function shiftWk(n){var d=parseIso(S.wkStart||defWeek());d.setDate(d.getDate()+n);S.wkStart=iso(d);save();render()}
+$("wkprev").onclick=function(){shiftWk(-7)};
+$("wknext").onclick=function(){shiftWk(7)};
+$("wkprint").onclick=function(){window.print()};
+$("wkx").onclick=function(){
+  var w=wkModel(),pad=CATS.map(function(){return null}),all=w.tot;
+  var out=[["Name",S.tsName||""],["Week",w.ws+" to "+w.days[6]],[],["Output Product","Job No.","Work Description","Consumed Manhour"].concat(CATS.map(function(c,i){return(i>=6?"TM Concerns - ":"")+c[2]}))];
+  w.rows.forEach(function(r){out.push([r.out,r.job,r.desc,r.h].concat(pad))});
+  out.push(["Non-project time","","",null].concat(CATS.map(function(c){return w.cat[c[0]]||null})));
+  CATS.forEach(function(c){all+=w.cat[c[0]]});
+  out.push(["TOTAL","","",w.tot].concat(CATS.map(function(c){return w.cat[c[0]]})));
+  var tmv=w.cat.vl+w.cat.sl+w.cat.ob;
+  out.push(["TM CONCERNS TOTAL (VL + SL + OB)","","",null].concat(CATS.slice(0,6).map(function(){return null}),[tmv]));
+  out.push(["GRAND TOTAL","","",all]);
+  var ws=XLSX.utils.aoa_to_sheet(out);ws["!cols"]=[{wch:26},{wch:14},{wch:40},{wch:12}].concat(CATS.map(function(){return{wch:14}}));
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Weekly report");
+  XLSX.writeFile(wb,"weekly-report-"+w.ws+".xlsx")};
+function bulkDays(){
+  var a=$("bf").value,b=$("bto").value;
+  if(!a||!b||a>b){say("Check the From and To dates.");return null}
+  var dows={},out=[],d=parseIso(a),e=parseIso(b);
+  document.querySelectorAll("#bdows input").forEach(function(x){if(x.checked)dows[x.dataset.dow]=1});
+  for(;d<=e&&out.length<92;d.setDate(d.getDate()+1))if(dows[d.getDay()])out.push(iso(d));
+  return out}
+$("bapply").onclick=function(){
+  var t=$("bt").value;if(!t)return say("Pick a day type first.");
+  var days=bulkDays();if(!days)return;var ov=$("bov").checked,n=0;
+  days.forEach(function(s){var o=S.ts[s]=S.ts[s]||{};if(o.h&&!ov)return;o.h=t;n++});
+  save();render();say("Set "+t+" on "+n+" day"+(n===1?"":"s")+(n<days.length?" ("+(days.length-n)+" already had a day type; tick Overwrite to replace them).":"."))};
+$("bclear").onclick=function(){
+  var days=bulkDays();if(!days)return;var n=0;
+  days.forEach(function(s){if(S.ts[s]&&S.ts[s].h){S.ts[s].h="";n++}});
+  save();render();say("Cleared the day type on "+n+" day"+(n===1?"":"s")+".")};
 function syncBar(){if(S.dates.length){$("start").value=S.dates[0];$("days").value=S.dates.length}}
 load();ensureLists();
 buildPeriod();

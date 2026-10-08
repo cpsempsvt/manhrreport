@@ -156,6 +156,7 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
     </div>
   </span>
   <span class="sp"></span>
+  <label class="chk" style="padding-bottom:6px"><input type="checkbox" id="hideempty" checked>Hide tasks with no hours</label>
   <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv" hidden>
   <button id="imp" class="primary">Import Excel</button>
   <button id="exp">Export Excel</button>
@@ -182,12 +183,6 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
   <button id="addb" class="primary">Add task</button>
   <button id="golists">Edit dropdown lists</button>
 </div>
-<div class="bar">
-  <strong style="padding-bottom:6px">Logged time and OT by half-month</strong><span class="sp"></span>
-  <label>OT limit from (hrs)<input type="number" id="thor" step="0.5" min="0" style="width:90px"></label>
-  <label>OT warning from (hrs)<input type="number" id="thred" step="0.5" min="0" style="width:90px"></label>
-</div>
-<div class="wrap"><table id="halves" class="rep"></table></div>
 </section>
 
 <section id="v-sheet" hidden>
@@ -198,6 +193,12 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
 <section id="v-dash" hidden>
   <div class="bar"><label>Season year<input type="number" id="dyear" style="width:90px"></label><label>View<select id="dview" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)"><option value="both">Midterm and Finals</option><option value="mid">Midterm only</option><option value="fin">Finals only</option></select></label><span class="hint" id="dlabel" style="padding-bottom:8px"></span></div>
   <div class="lists" id="dash"></div>
+  <div class="bar">
+    <strong style="padding-bottom:6px">Logged time and OT by half-month</strong><span class="sp"></span>
+    <label>OT limit from (hrs)<input type="number" id="thor" step="0.5" min="0" style="width:90px"></label>
+    <label>OT warning from (hrs)<input type="number" id="thred" step="0.5" min="0" style="width:90px"></label>
+  </div>
+  <div class="wrap"><table id="halves" class="rep"></table></div>
 </section>
 
 <section id="v-backup" hidden>
@@ -248,7 +249,9 @@ function say(t){$("msg").textContent=t}
 function num(v){var n=parseFloat(v);return isNaN(n)?0:n}
 function fmt(n){return n?(Math.round(n*100)/100):""}
 
+var freshItems=[];
 function render(){
+  $("hideempty").checked=S.hideEmpty!==false;
   if(S.dates.length){var a=$("bf").value,b=$("bto").value,f0=S.dates[0],l0=S.dates[S.dates.length-1];
     if(!a||a<f0||a>l0)$("bf").value=f0;if(!b||b<f0||b>l0)$("bto").value=l0}fillSelects();renderLists();renderSheet();if(!$("calpop").hidden)renderCal();renderWeekly();renderHalves();renderDash();
   var g=$("grid"),h="<thead><tr><th>Project</th><th>Task</th><th>Description</th><th>Target</th><th></th>";
@@ -263,7 +266,10 @@ function render(){
     h+='<th><select data-dt="'+s+'" aria-label="Day type '+s+'">'+opts+"</select></th>"});
   h+="<th></th><th></th></tr></thead><tbody>";
   if(!S.items.length){g.innerHTML=h+'<tr><td colspan="'+(S.dates.length+7)+'" class="empty">No tasks yet. Add one below or import your Excel file.</td></tr></tbody>';return}
+  var shown=0;
   S.items.forEach(function(it,i){
+    if(S.hideEmpty!==false&&freshItems.indexOf(it)<0&&!S.dates.some(function(d){return it.est[d]||it.log[d]}))return;
+    shown++;
     ["est","log"].forEach(function(k,r){
       var tot=0;
       h+="<tr>";
@@ -276,6 +282,7 @@ function render(){
       if(!r)h+='<td rowspan="2"><button class="del" data-del="'+i+'" title="Delete task">✕</button></td>';
       h+="</tr>"});
   });
+  if(!shown)h+='<tr><td colspan="'+(S.dates.length+7)+'" class="empty">No tasks have hours in this range. Untick "Hide tasks with no hours" to see all tasks.</td></tr>';
   h+="</tbody><tfoot>";
   ["est","log"].forEach(function(k){
     var all=0;h+='<tr><td colspan="5" style="text-align:left">'+(k==="est"?"Total estimated":"Total logged")+"</td>";
@@ -307,7 +314,7 @@ $("range").onclick=function(){
 $("addb").onclick=function(){
   var t=$("nt").value.trim(),d=$("nd").value.trim();
   if(!t)return say("Pick a task name. Add choices in the Lists tab.");
-  S.items.push({project:$("np").value.trim(),target:$("ng").value,task:t,desc:d||"Checking",est:{},log:{}});$("nt").value="";save();render();say("")};
+  S.items.push({project:$("np").value.trim(),target:$("ng").value,task:t,desc:d||"Checking",est:{},log:{}});freshItems.push(S.items[S.items.length-1]);$("nt").value="";save();render();say("")};
 $("clr").onclick=function(){if(confirm("Remove all tasks and hours?")){S.items=[];save();render()}};
 
 // ---------- Excel import ----------
@@ -830,6 +837,7 @@ $("caldtgo").onclick=function(){
   var ds=calDays();if(!ds.length)return;var v=$("caldt").value;
   ds.forEach(function(d){var o=S.ts[d]=S.ts[d]||{};o.h=v});
   save();render();say((v?"Day type "+v:"Day type cleared")+" on "+ds.length+" day"+(ds.length===1?"":"s")+".")};
+$("hideempty").onchange=function(){S.hideEmpty=this.checked;save();render()};
 function syncBar(){if(S.dates.length){$("start").value=S.dates[0];$("days").value=S.dates.length}}
 load();ensureLists();
 buildPeriod();

@@ -66,6 +66,8 @@ tfoot td{background:var(--task2);font-weight:600;padding:5px 6px}
 .chip button{border:0;background:none;padding:0 6px;color:var(--mute);cursor:pointer}
 #grid select.tg{border:0;background:transparent;font:inherit;color:var(--ink);padding:4px;max-width:120px}
 .bar label.chk{flex-direction:row;align-items:center;gap:4px;font-size:13px;color:var(--ink)}
+textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:12px/1.4 ui-monospace,Consolas,monospace;word-break:break-all;resize:vertical}
+.card p{margin:0 0 8px}
 .hint{color:var(--mute)}
 .mini{width:100%;border-collapse:collapse}
 .mini th,.mini td{padding:5px 10px;text-align:left;border:1px solid var(--line)}
@@ -92,6 +94,8 @@ table.rep td{border:1px solid var(--line);padding:2px 6px;height:28px;background
 table.rep td.l{text-align:left}
 table.rep tr.np td{background:var(--task2)}
 table.rep input{border:0;background:transparent;font:inherit;color:inherit;text-align:center;width:100%;min-width:52px;padding:2px}
+table.rep td.warn{background:#ffa726;color:#000;font-weight:600}
+table.rep td.crit{background:#e5484d;color:#fff;font-weight:600}
 table.rep tfoot td{background:var(--task2);font-weight:600}
 @media print{.tabs,.bar,.add,#msg,header p{display:none}.wrap{margin:0;border:0}body{background:#fff;color:#000}}
 #msg{padding:0 20px;color:var(--mute);min-height:20px}
@@ -108,6 +112,7 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
   <button id="t-sheet">Timesheet</button>
   <button id="t-weekly">Weekly report</button>
   <button id="t-lists">Lists</button>
+  <button id="t-backup">Backup</button>
 </nav>
 <div class="bar" id="pbar"><label>Month (period)<select id="pm" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)"></select></label><label>Year<input type="number" id="py" style="width:90px"></label><span id="plabel" class="hint" style="padding-bottom:8px"></span></div>
 <section id="v-tracker">
@@ -143,11 +148,40 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
   <button id="addb" class="primary">Add task</button>
   <button id="golists">Edit dropdown lists</button>
 </div>
+<div class="bar">
+  <strong style="padding-bottom:6px">Logged time and OT by half-month</strong><span class="sp"></span>
+  <label>OT limit from (hrs)<input type="number" id="thor" step="0.5" min="0" style="width:90px"></label>
+  <label>OT warning from (hrs)<input type="number" id="thred" step="0.5" min="0" style="width:90px"></label>
+</div>
+<div class="wrap"><table id="halves" class="rep"></table></div>
 </section>
 
 <section id="v-sheet" hidden>
   <div class="bar"><label>Name<input type="text" id="tsname" placeholder="Employee name" style="width:180px"></label><label>From<input type="date" id="tsfrom"></label><label>To<input type="date" id="tsto"></label><label>Regular hours per day<input type="number" id="reg" step="0.25" min="0" style="width:90px"></label><span class="sp"></span><input type="file" id="sfile" accept=".xlsx,.xls,.xlsm,.csv" hidden><button id="simp" class="primary">Import timesheet</button><button id="sx">Export timesheet</button><button id="sprint">Print</button></div>
   <div class="wrap"><table id="sheet"></table></div>
+</section>
+
+<section id="v-backup" hidden>
+  <div class="lists">
+    <div class="card">
+      <h2>Back up your data</h2>
+      <p class="hint">Saves everything: tasks, hours, timesheet, weekly report entries, lists and settings.</p>
+      <div class="row"><button id="bkfile" class="primary">Download backup file</button></div>
+      <h2 style="margin-top:16px">Backup code</h2>
+      <p class="hint">A block of text you can copy to another PC. Set an access code to lock it; you will need the same code to open it.</p>
+      <div class="row"><input type="text" id="bkpass" placeholder="Access code (optional)" autocomplete="off"><button id="bkmake">Create code</button></div>
+      <textarea id="bkcode" rows="5" readonly placeholder="Your backup code appears here"></textarea>
+      <div class="row" style="margin-top:8px"><button id="bkcopy">Copy code</button><button id="bkcodefile">Save code as .txt</button></div>
+    </div>
+    <div class="card">
+      <h2>Restore</h2>
+      <p class="hint">Restoring replaces what is currently in this browser.</p>
+      <div class="row"><input type="file" id="rfile" accept=".json,application/json" hidden><button id="rfbtn">Restore from backup file</button></div>
+      <h2 style="margin-top:16px">Restore from code</h2>
+      <textarea id="rcode" rows="5" placeholder="Paste your backup code here"></textarea>
+      <div class="row" style="margin-top:8px"><input type="text" id="rpass" placeholder="Access code (if you set one)" autocomplete="off"><button id="rgo" class="primary">Restore</button></div>
+    </div>
+  </div>
 </section>
 
 <section id="v-weekly" hidden>
@@ -157,13 +191,8 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
 </section>
 
 <section id="v-lists" hidden>
-  <div class="lists">
-    <div class="card"><h2>Projects</h2><div class="row"><input id="li-projects" placeholder="New project"><button data-add="projects" class="primary">Add</button></div><div class="chips" id="ch-projects"></div></div>
-    <div class="card"><h2>Task names</h2><div class="row"><input id="li-tasks" placeholder="New task name"><button data-add="tasks" class="primary">Add</button></div><div class="chips" id="ch-tasks"></div></div>
-    <div class="card"><h2>Descriptions</h2><div class="row"><input id="li-descs" placeholder="New description"><button data-add="descs" class="primary">Add</button></div><div class="chips" id="ch-descs"></div></div>
-    <div class="card"><h2>Day types (Tracker and Timesheet dropdown)</h2><div class="row"><input id="li-holidays" placeholder="New day type"><button data-add="holidays" class="primary">Add</button></div><div class="chips" id="ch-holidays"></div></div>
-    <div class="card"><h2>Targets</h2><div class="row"><input id="li-targets" placeholder="New target (e.g. Target 4)"><button data-add="targets" class="primary">Add</button></div><div class="chips" id="ch-targets"></div></div>
-  </div>
+  <div class="bar"><span class="hint">These fill the dropdowns. Paste a column or a block copied from Excel into any cell, or type items one per cell. Clear a cell to remove an item. Changes save when you leave a cell.</span></div>
+  <div class="wrap"><table id="lt" class="rep"></table></div>
 </section>
 
 <script>
@@ -182,7 +211,7 @@ function fmt(n){return n?(Math.round(n*100)/100):""}
 
 function render(){
   if(S.dates.length){var a=$("bf").value,b=$("bto").value,f0=S.dates[0],l0=S.dates[S.dates.length-1];
-    if(!a||a<f0||a>l0)$("bf").value=f0;if(!b||b<f0||b>l0)$("bto").value=l0}renderTargets();fillSelects();renderLists();renderSheet();renderWeekly();
+    if(!a||a<f0||a>l0)$("bf").value=f0;if(!b||b<f0||b>l0)$("bto").value=l0}renderTargets();fillSelects();renderLists();renderSheet();renderWeekly();renderHalves();
   var g=$("grid"),h="<thead><tr><th>Project</th><th>Task</th><th>Description</th><th>Target</th><th></th>";
   S.dates.forEach(function(s){var d=parseIso(s),w=d.getDay()%6===0;
     h+='<th class="'+(dayCls(s)||(w?"wk":""))+'"'+(dayCls(s)?' title="'+esc((S.ts[s]||{}).h||"")+'"':"")+'>'+(d.getMonth()+1)+"/"+d.getDate()+"<small>"+"SMTWTFS"[d.getDay()]+"</small></th>"});
@@ -213,7 +242,11 @@ function render(){
     var all=0;h+='<tr><td colspan="5" style="text-align:left">'+(k==="est"?"Total estimated":"Total logged")+"</td>";
     S.dates.forEach(function(s){var t=0;S.items.forEach(function(it){t+=num(it[k][s])});all+=t;h+="<td>"+fmt(t)+"</td>"});
     h+="<td>"+fmt(all)+"</td><td></td></tr>"});
-  g.innerHTML=h+"</tfoot>";
+  var nt=0,xt=0,nr='<tr><td colspan="5" style="text-align:left">Nominal (regular) hrs</td>',xr='<tr><td colspan="5" style="text-align:left">Excess over regular (OT)</td>';
+  S.dates.forEach(function(s){var man=S.nom&&S.nom[s]!==undefined,nv=nomOf(s),xv=excessOf(s);nt+=nv;xt+=xv;
+    nr+='<td class="c"><input type="number" step="0.5" min="0" data-nom="'+s+'" value="'+(man?S.nom[s]:"")+'" placeholder="'+(nomDef(s)||"0")+'" title="Regular hours for this day. Leave blank for the default." aria-label="Nominal hours '+s+'"></td>';
+    xr+="<td>"+fmt(xv)+"</td>"});
+  g.innerHTML=h+nr+"<td>"+fmt(nt)+"</td><td></td></tr>"+xr+"<td>"+fmt(xt)+"</td><td></td></tr></tfoot>";
   
 }
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -300,7 +333,7 @@ $("exp").onclick=function(){
   ws["!cols"]=[{wch:20},{wch:36},{wch:14},{wch:12},{wch:16}].concat(S.dates.map(function(){return{wch:6}}));
   var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Man-hours");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Target","Estimated","Logged"]].concat(targetTotals())),"By target");
-  XLSX.writeFile(wb,"man-hours-"+iso(new Date())+".xlsx");
+  saveXlsx(wb,"man-hours-"+iso(new Date())+".xlsx");
 };
 
 function ensureLists(){
@@ -325,22 +358,30 @@ function fillSelects(){
     el.innerHTML='<option value="">'+x[2]+'…</option>'+S.lists[x[1]].map(function(v){return"<option>"+esc(v)+"</option>"}).join("");
     el.value=cur});
 }
-function renderLists(){
-  ["projects","tasks","descs","holidays","targets"].forEach(function(k){
-    $("ch-"+k).innerHTML=S.lists[k].map(function(v,i){return'<span class="chip">'+esc(v)+'<button data-rm="'+k+'" data-i="'+i+'" aria-label="Remove '+esc(v)+'">✕</button></span>'}).join("")||'<span class="hint">Nothing yet</span>'});
-}
-$("v-lists").addEventListener("click",function(e){
-  var a=e.target.closest("[data-add]");
-  if(a){var k=a.dataset.add,inp=$("li-"+k),v=inp.value.trim();
-    if(v&&S.lists[k].indexOf(v)<0){S.lists[k].push(v);save();render()}
-    $("li-"+k).value="";$("li-"+k).focus();return}
-  var r=e.target.closest("[data-rm]");
-  if(r){S.lists[r.dataset.rm].splice(+r.dataset.i,1);save();render()}
-});
-$("v-lists").addEventListener("keydown",function(e){
-  if(e.key==="Enter"&&e.target.id.indexOf("li-")===0)document.querySelector('[data-add="'+e.target.id.slice(3)+'"]').click()});
-function tab(n){["tracker","sheet","weekly","lists"].forEach(function(k){$("v-"+k).hidden=k!==n;$("t-"+k).classList.toggle("on",k===n)});say("")}
-["tracker","sheet","weekly","lists"].forEach(function(k){$("t-"+k).onclick=function(){tab(k)}});
+var LKEYS=[["projects","Projects"],["tasks","Task names"],["descs","Descriptions"],["holidays","Day types"],["targets","Targets"]];
+function buildListsTable(){
+  var n=Math.max(15,Math.max.apply(null,LKEYS.map(function(k){return S.lists[k[0]].length}))+10);
+  var h="<thead><tr>"+LKEYS.map(function(k){return"<th>"+k[1]+"</th>"}).join("")+"</tr></thead><tbody>";
+  for(var r=0;r<n;r++){h+="<tr>";LKEYS.forEach(function(k,c){h+='<td><input type="text" data-c="'+c+'" data-r="'+r+'" value="'+esc(S.lists[k[0]][r]||"")+'" aria-label="'+k[1]+' row '+(r+1)+'"></td>'});h+="</tr>"}
+  $("lt").innerHTML=h+"</tbody>"}
+function renderLists(){if(!$("lt").contains(document.activeElement))buildListsTable()}
+function readCols(){var cols=LKEYS.map(function(){return[]});document.querySelectorAll("#lt input").forEach(function(i){cols[+i.dataset.c][+i.dataset.r]=i.value});return cols}
+function commitCols(cols){
+  LKEYS.forEach(function(k,c){var seen={},out=[];(cols[c]||[]).forEach(function(v){v=String(v||"").trim();if(v&&!seen[v]){seen[v]=1;out.push(v)}});S.lists[k[0]]=out});
+  save();buildListsTable();render()}
+$("lt").addEventListener("change",function(e){if(e.target.dataset.c!==undefined)commitCols(readCols())});
+$("lt").addEventListener("paste",function(e){
+  var t=e.target;if(t.dataset.c===undefined)return;
+  var txt=(e.clipboardData||window.clipboardData).getData("text");
+  if(txt.indexOf("\n")<0&&txt.indexOf("\t")<0)return;
+  e.preventDefault();
+  var rows=txt.replace(/\r/g,"").replace(/\n+$/,"").split("\n").map(function(r){return r.split("\t")});
+  var c0=+t.dataset.c,r0=+t.dataset.r,cols=readCols();
+  rows.forEach(function(row,i){row.forEach(function(v,j){var c=c0+j;if(c>=LKEYS.length)return;cols[c][r0+i]=v.trim()})});
+  commitCols(cols);
+  say("Pasted "+rows.length+" row"+(rows.length===1?"":"s")+".")});
+function tab(n){["tracker","sheet","weekly","lists","backup"].forEach(function(k){$("v-"+k).hidden=k!==n;$("t-"+k).classList.toggle("on",k===n)});say("")}
+["tracker","sheet","weekly","lists","backup"].forEach(function(k){$("t-"+k).onclick=function(){tab(k)}});
 $("golists").onclick=function(){tab("lists")};
 $("sprint").onclick=function(){window.print()};
 function calc(s){
@@ -354,7 +395,7 @@ $("sx").onclick=function(){
     out.push([(d.getMonth()+1)+"/"+d.getDate()+" ("+"SMTWTFS"[d.getDay()]+")",c.t.s||"",c.t.e||"",c.w===null?"":c.br,c.w===null?"":c.w,c.w===null?"":c.e,c.w===null?"":c.e,((c.t.h||"")+(c.t.h&&c.t.r?" - ":"")+(c.t.r||""))])});
   var ws=XLSX.utils.aoa_to_sheet(out);ws["!cols"]=[{wch:12},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12},{wch:8},{wch:30}];
   var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Timesheet");
-  XLSX.writeFile(wb,"timesheet-"+iso(new Date())+".xlsx")};
+  saveXlsx(wb,"timesheet-"+iso(new Date())+".xlsx")};
 $("sheet").addEventListener("change",function(e){
   var t=e.target;if(!t.dataset.f)return;
   var o=S.ts[t.dataset.d]=S.ts[t.dataset.d]||{};o[t.dataset.f]=t.value;save();render()});
@@ -392,6 +433,17 @@ $("grid").addEventListener("change",function(e){
   o.h=t.value;
   save();render()});
 function dayCls(s){var h=((S.ts&&S.ts[s]&&S.ts[s].h)||"").trim();return/holiday/i.test(h)?"hol":/^(vl|sl)$/i.test(h)?"leave":""}
+function nomDef(s){
+  var wd=parseIso(s).getDay(),h=((S.ts[s]||{}).h||"").trim().toLowerCase();
+  if(wd===0||wd===6||/holiday/.test(h)||h==="vl"||h==="sl")return 0;
+  return num(S.reg)}
+function nomOf(s){return S.nom&&S.nom[s]!==undefined?num(S.nom[s]):nomDef(s)}
+function dayLogged(s){var t=0;S.items.forEach(function(it){t+=num(it.log[s])});return t}
+function excessOf(s){return Math.max(0,dayLogged(s)-nomOf(s))}
+$("grid").addEventListener("change",function(e){
+  var t=e.target;if(t.dataset.nom===undefined)return;
+  S.nom=S.nom||{};if(t.value==="")delete S.nom[t.dataset.nom];else S.nom[t.dataset.nom]=num(t.value);
+  save();render()});
 function isHol(s){return/holiday/i.test((S.ts&&S.ts[s]&&S.ts[s].h)||"")}
 function topts(v){return'<option value=""></option>'+S.lists.targets.map(function(x){return"<option"+(x===v?" selected":"")+">"+esc(x)+"</option>"}).join("")}
 $("grid").addEventListener("change",function(e){
@@ -547,7 +599,7 @@ $("wkx").onclick=function(){
   out.push(["GRAND TOTAL","","",all]);
   var ws=XLSX.utils.aoa_to_sheet(out);ws["!cols"]=[{wch:26},{wch:14},{wch:40},{wch:12}].concat(CATS.map(function(){return{wch:14}}));
   var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Weekly report");
-  XLSX.writeFile(wb,"weekly-report-"+w.ws+".xlsx")};
+  saveXlsx(wb,"weekly-report-"+w.ws+".xlsx")};
 function bulkDays(){
   var a=$("bf").value,b=$("bto").value;
   if(!a||!b||a>b){say("Check the From and To dates.");return null}
@@ -564,6 +616,86 @@ $("bclear").onclick=function(){
   var days=bulkDays();if(!days)return;var n=0;
   days.forEach(function(s){if(S.ts[s]&&S.ts[s].h){S.ts[s].h="";n++}});
   save();render();say("Cleared the day type on "+n+" day"+(n===1?"":"s")+".")};
+function saveFile(name,data){
+  var plain=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data]));a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500)};
+  if(window.claude&&typeof claude.use==="function"){
+    claude.use("downloads").then(function(d){
+      if(!d)return plain();
+      d.save({filename:name,data:(data instanceof ArrayBuffer)?data.slice(0):data}).catch(function(e){if(!e||e.code!=="declined")say("Could not save the file here: "+((e&&(e.message||e.code))||"unknown error"))})
+    }).catch(plain)}
+  else plain()}
+function saveXlsx(wb,name){saveFile(name,XLSX.write(wb,{bookType:"xlsx",type:"array"}))}
+function b64e(u){var t="",i;for(i=0;i<u.length;i+=8192)t+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(t)}
+function b64d(t){var r=atob(t),u=new Uint8Array(r.length);for(var i=0;i<r.length;i++)u[i]=r.charCodeAt(i);return u}
+async function streamBytes(u,C,f){return new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new C(f))).arrayBuffer())}
+async function pkey(pass,salt){
+  if(!window.crypto||!crypto.subtle)throw new Error("Access codes need a secure (https) page.");
+  var km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt:salt,iterations:150000,hash:"SHA-256"},km,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+async function makeCode(pass){
+  var u=new TextEncoder().encode(JSON.stringify(S)),flags=0;
+  if(typeof CompressionStream!=="undefined"){u=await streamBytes(u,CompressionStream,"gzip");flags|=2}
+  if(pass){
+    var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),k=await pkey(pass,salt);
+    var enc=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},k,u)),o=new Uint8Array(28+enc.length);
+    o.set(salt,0);o.set(iv,16);o.set(enc,28);u=o;flags|=1}
+  return"MHT1"+flags+b64e(u)}
+async function readCode(code,pass){
+  code=code.replace(/\s+/g,"");
+  if(code.slice(0,4)!=="MHT1")throw new Error("That doesn't look like a backup code.");
+  var flags=+code[4],u=b64d(code.slice(5));
+  if(flags&1){
+    if(!pass)throw new Error("This code needs its access code.");
+    var k=await pkey(pass,u.subarray(0,16));
+    try{u=new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv:u.subarray(16,28)},k,u.subarray(28)))}catch(e){throw new Error("Wrong access code.")}}
+  if(flags&2){
+    if(typeof DecompressionStream==="undefined")throw new Error("This browser can't open compressed codes. Use a current Chrome, Edge, Firefox or Safari.");
+    u=await streamBytes(u,DecompressionStream,"gzip")}
+  return JSON.parse(new TextDecoder().decode(u))}
+function applyState(o){
+  if(!o||typeof o!=="object"||!Array.isArray(o.dates)||!Array.isArray(o.items))throw new Error("That isn't a backup from this app.");
+  S=o;ensureLists();save();
+  if(S.pMonth!==undefined)$("pm").value=S.pMonth;if(S.pYear)$("py").value=S.pYear;
+  pLabel();syncBar();render()}
+$("bkfile").onclick=function(){saveFile("manhour-backup-"+iso(new Date())+".json",JSON.stringify(S,null,1))};
+$("bkmake").onclick=async function(){
+  try{$("bkcode").value=await makeCode($("bkpass").value);say("Backup code created. Copy it and keep it somewhere safe.")}
+  catch(e){say("Could not create the code: "+e.message)}};
+$("bkcopy").onclick=function(){
+  var t=$("bkcode");if(!t.value)return say("Create a code first.");
+  t.select();var ok=false;try{ok=document.execCommand("copy")}catch(e){}
+  var done=function(g){say(g?"Copied.":"Select the code and press Ctrl+C.")};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t.value).then(function(){done(true)},function(){done(ok)});else done(ok)};
+$("bkcodefile").onclick=function(){if($("bkcode").value)saveFile("manhour-backup-code.txt",$("bkcode").value);else say("Create a code first.")};
+$("rfbtn").onclick=function(){$("rfile").click()};
+$("rfile").onchange=function(e){
+  var f=e.target.files[0];if(!f)return;var r=new FileReader();
+  r.onload=function(){try{var o=JSON.parse(r.result);if(!confirm("Replace the data in this browser with this backup?"))return;applyState(o);say("Backup restored.")}catch(err){say("Could not restore: "+err.message)}};
+  r.readAsText(f);e.target.value=""};
+$("rgo").onclick=async function(){
+  try{var o=await readCode($("rcode").value,$("rpass").value);if(!confirm("Replace the data in this browser with this backup?"))return;applyState(o);say("Backup restored.")}
+  catch(err){say("Could not restore: "+err.message)}};
+function renderHalves(){
+  var o=S.thO===undefined?15:S.thO,r=S.thR===undefined?22.5:S.thR;
+  setv("thor",o);setv("thred",r);
+  var a=[],b=[],g={},order=[];
+  S.dates.forEach(function(d){var n=parseIso(d).getDate();(n>=23||n<=7?a:b).push(d)});
+  var span=function(l){if(!l.length)return"–";var x=parseIso(l[0]),y=parseIso(l[l.length-1]);return(x.getMonth()+1)+"/"+x.getDate()+" – "+(y.getMonth()+1)+"/"+y.getDate()};
+  var cls=function(v){return v>=r&&r>0?"crit":v>=o&&o>0?"warn":""};
+  var sum=function(l,f){var t=0;l.forEach(function(d){t+=f(d)});return t};
+  S.items.forEach(function(it){
+    var k=[it.project,it.task,it.desc].join("\u0001");
+    if(!g[k]){g[k]={it:it,a:0,b:0};order.push(g[k])}
+    a.forEach(function(d){g[k].a+=num(it.log[d])});b.forEach(function(d){g[k].b+=num(it.log[d])})});
+  order=order.filter(function(x){return x.a||x.b});
+  var ta=0,tb=0,h="<caption>Logged hours · OT limit from "+o+" hrs, warning from "+r+" hrs</caption><thead><tr><th>Project</th><th>Task</th><th>Description</th><th>1st cut-off<br><small>"+span(a)+"</small></th><th>2nd cut-off<br><small>"+span(b)+"</small></th><th>Total</th></tr></thead><tbody>";
+  if(!order.length)h+='<tr><td colspan="6" class="hint" style="padding:18px">No logged hours in this period yet.</td></tr>';
+  order.forEach(function(x){ta+=x.a;tb+=x.b;
+    h+='<tr><td class="l">'+esc(x.it.project||"")+'</td><td class="l">'+esc(x.it.task)+'</td><td class="l">'+esc(x.it.desc)+"</td><td>"+fmt(x.a)+"</td><td>"+fmt(x.b)+"</td><td>"+fmt(x.a+x.b)+"</td></tr>"});
+  var na=sum(a,nomOf),nb=sum(b,nomOf),oa=sum(a,excessOf),ob=sum(b,excessOf);
+  $("halves").innerHTML=h+'</tbody><tfoot><tr><td colspan="3" style="text-align:left">TOTAL LOGGED</td><td>'+fmt(ta)+"</td><td>"+fmt(tb)+"</td><td>"+fmt(ta+tb)+'</td></tr><tr><td colspan="3" style="text-align:left">NOMINAL (REGULAR) HRS</td><td>'+fmt(na)+"</td><td>"+fmt(nb)+"</td><td>"+fmt(na+nb)+'</td></tr><tr><td colspan="3" style="text-align:left">OT (EXCESS OVER REGULAR)</td><td class="'+cls(oa)+'">'+fmt(oa)+'</td><td class="'+cls(ob)+'">'+fmt(ob)+"</td><td>"+fmt(oa+ob)+"</td></tr></tfoot>"}
+$("thor").onchange=function(){S.thO=num(this.value);save();render()};
+$("thred").onchange=function(){S.thR=num(this.value);save();render()};
 function syncBar(){if(S.dates.length){$("start").value=S.dates[0];$("days").value=S.dates.length}}
 load();ensureLists();
 buildPeriod();

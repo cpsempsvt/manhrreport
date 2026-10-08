@@ -68,6 +68,29 @@ tfoot td{background:var(--task2);font-weight:600;padding:5px 6px}
 .bar label.chk{flex-direction:row;align-items:center;gap:4px;font-size:13px;color:var(--ink)}
 textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:12px/1.4 ui-monospace,Consolas,monospace;word-break:break-all;resize:vertical}
 .card p{margin:0 0 8px}
+.kpis{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.kpi{background:var(--task2);border-radius:8px;padding:8px 12px;min-width:92px}
+.kpi b{display:block;font-size:20px}.kpi span{font-size:12px;color:var(--mute)}
+#dash{grid-template-columns:repeat(auto-fit,minmax(420px,1fr));align-items:start}
+#dash.single{grid-template-columns:1fr}
+.mini td.warn{background:#ffa726;color:#000;font-weight:600}.mini td.crit{background:#e5484d;color:#fff;font-weight:600}
+.mini caption{text-align:left;font-weight:600;padding:10px 0 4px}
+.pop{position:absolute;z-index:30;top:calc(100% + 4px);left:0;width:340px;max-height:80vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.25);padding:12px}
+.pop .prow{display:flex;flex-wrap:wrap;gap:6px;align-items:end;justify-content:space-between;margin-bottom:8px}
+.pop .ml{font-weight:600;margin:8px 0 4px}
+.calg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.calg .dh{font-size:11px;color:var(--mute);text-align:center}
+.calg button.cd{padding:3px 0;min-height:38px;font-size:13px;border-radius:6px;background:var(--panel)}
+.calg button.cd.wk{background:var(--wk)}
+.calg button.cd.sel{background:var(--head);border-color:var(--head);color:#fff}
+.calg button.cd small{display:block;font-size:9px;opacity:.85}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpi{display:flex;flex-direction:column;justify-content:center;min-width:0;min-height:62px}
+@media (max-width:520px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.proj{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line)}
+.proj .pt{flex:1;min-width:240px}.proj .ph{margin-bottom:4px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.mb{height:5px;margin-top:3px;border-radius:3px;background:var(--line);overflow:hidden}.mb i{display:block;height:100%}
 .hint{color:var(--mute)}
 .mini{width:100%;border-collapse:collapse}
 .mini th,.mini td{padding:5px 10px;text-align:left;border:1px solid var(--line)}
@@ -111,6 +134,7 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
   <button id="t-tracker" class="on">Tracker</button>
   <button id="t-sheet">Timesheet</button>
   <button id="t-weekly">Weekly report</button>
+  <button id="t-dash">Dashboard</button>
   <button id="t-lists">Lists</button>
   <button id="t-backup">Backup</button>
 </nav>
@@ -120,6 +144,16 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
   <label>Start date<input type="date" id="start"></label>
   <label>Days<input type="number" id="days" min="1" max="90" value="21" style="width:70px"></label>
   <button id="range">Set range</button>
+  <span style="position:relative;display:inline-block">
+    <button id="calbtn" aria-haspopup="true">Select days ▾</button>
+    <div id="calpop" class="pop" hidden>
+      <div class="prow"><b>Select days</b><span id="calcount" class="hint"></span></div>
+      <div class="prow"><button type="button" id="calwk">Weekdays</button><button type="button" id="calwe">Weekends</button><button type="button" id="calall">All</button><button type="button" id="calclr">Clear</button></div>
+      <div id="calgrid"></div>
+      <div class="prow" style="margin-top:10px"><label>Nominal hrs<input type="number" id="calnom" step="0.5" min="0" style="width:70px"></label><button id="calnomgo" class="primary">Set</button><button id="calnomrs">Reset to default</button></div>
+      <div class="prow"><label>Day type<select id="caldt"></select></label><button id="caldtgo" class="primary">Apply</button></div>
+    </div>
+  </span>
   <span class="sp"></span>
   <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv" hidden>
   <button id="imp" class="primary">Import Excel</button>
@@ -138,7 +172,6 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
   <button id="bapply" class="primary">Apply</button><button id="bclear">Clear</button>
 </div>
 <div class="wrap"><table id="grid"></table></div>
-<div class="lists" id="tsum"></div>
 
 <div class="add">
   <select id="np"></select>
@@ -159,6 +192,11 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
 <section id="v-sheet" hidden>
   <div class="bar"><label>Name<input type="text" id="tsname" placeholder="Employee name" style="width:180px"></label><label>From<input type="date" id="tsfrom"></label><label>To<input type="date" id="tsto"></label><label>Regular hours per day<input type="number" id="reg" step="0.25" min="0" style="width:90px"></label><span class="sp"></span><input type="file" id="sfile" accept=".xlsx,.xls,.xlsm,.csv" hidden><button id="simp" class="primary">Import timesheet</button><button id="sx">Export timesheet</button><button id="sprint">Print</button></div>
   <div class="wrap"><table id="sheet"></table></div>
+</section>
+
+<section id="v-dash" hidden>
+  <div class="bar"><label>Season year<input type="number" id="dyear" style="width:90px"></label><label>View<select id="dview" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)"><option value="both">Midterm and Finals</option><option value="mid">Midterm only</option><option value="fin">Finals only</option></select></label><span class="hint" id="dlabel" style="padding-bottom:8px"></span></div>
+  <div class="lists" id="dash"></div>
 </section>
 
 <section id="v-backup" hidden>
@@ -211,7 +249,7 @@ function fmt(n){return n?(Math.round(n*100)/100):""}
 
 function render(){
   if(S.dates.length){var a=$("bf").value,b=$("bto").value,f0=S.dates[0],l0=S.dates[S.dates.length-1];
-    if(!a||a<f0||a>l0)$("bf").value=f0;if(!b||b<f0||b>l0)$("bto").value=l0}renderTargets();fillSelects();renderLists();renderSheet();renderWeekly();renderHalves();
+    if(!a||a<f0||a>l0)$("bf").value=f0;if(!b||b<f0||b>l0)$("bto").value=l0}fillSelects();renderLists();renderSheet();if(!$("calpop").hidden)renderCal();renderWeekly();renderHalves();renderDash();
   var g=$("grid"),h="<thead><tr><th>Project</th><th>Task</th><th>Description</th><th>Target</th><th></th>";
   S.dates.forEach(function(s){var d=parseIso(s),w=d.getDay()%6===0;
     h+='<th class="'+(dayCls(s)||(w?"wk":""))+'"'+(dayCls(s)?' title="'+esc((S.ts[s]||{}).h||"")+'"':"")+'>'+(d.getMonth()+1)+"/"+d.getDate()+"<small>"+"SMTWTFS"[d.getDay()]+"</small></th>"});
@@ -316,9 +354,15 @@ function importWb(wb){
     if(!map[key]){map[key]={project:project,target:target,task:task,desc:desc,est:{},log:{}};order.push(map[key])}
     cols.forEach(function(x){var v=r[x.c];if(typeof v==="number"&&v)map[key][k][x.d]=v});
   });
-  S.dates=cols.map(function(x){return x.d}).filter(function(v,i,a){return a.indexOf(v)===i});
-  S.items=order;ensureLists();save();render();syncBar();
-  say("Imported "+order.length+" task rows and "+S.dates.length+" days.");
+  var imp=cols.map(function(x){return x.d}).filter(function(v,i,a){return a.indexOf(v)===i}),added=0,upd=0;
+  order.forEach(function(n){
+    var ex=S.items.filter(function(x){return(x.project||"")===(n.project||"")&&(x.target||"")===(n.target||"")&&x.task===n.task&&x.desc===n.desc})[0];
+    if(ex){Object.keys(n.est).forEach(function(d){ex.est[d]=n.est[d]});Object.keys(n.log).forEach(function(d){ex.log[d]=n.log[d]});upd++}
+    else{S.items.push(n);added++}});
+  var inView=imp.some(function(d){return S.dates.indexOf(d)>=0});
+  if(!inView)S.dates=imp;
+  ensureLists();save();render();syncBar();
+  say("Imported "+order.length+" task rows ("+added+" new, "+upd+" updated). Your existing tasks and hours were kept."+(inView?"":" The date range was switched to the imported dates."));
 }
 
 // ---------- Excel export ----------
@@ -337,7 +381,7 @@ $("exp").onclick=function(){
 };
 
 function ensureLists(){
-  var fresh=!S.lists;S.lists=S.lists||{};S.ts=S.ts||{};S.reg=S.reg||7.5;
+  var fresh=!S.lists;S.lists=S.lists||{};S.ts=S.ts||{};S.reg=S.reg||7.5;delete S.nomDow;
   ["projects","tasks","descs"].forEach(function(k){S.lists[k]=S.lists[k]||[]});
   if(fresh)S.lists.descs=["Checking","Revision"];
   var DT=["WFO","WFH","On Site","OB","VL","SL","Holiday"];
@@ -353,7 +397,7 @@ function ensureLists(){
   S.items.forEach(function(it){add("projects",it.project);add("tasks",it.task);add("descs",it.desc);add("targets",it.target)});
 }
 function fillSelects(){
-  [["np","projects","Project"],["nt","tasks","Task"],["nd","descs","Description"],["ng","targets","Target"],["bt","holidays","Day type"]].forEach(function(x){
+  [["np","projects","Project"],["nt","tasks","Task"],["nd","descs","Description"],["ng","targets","Target"],["bt","holidays","Day type"],["caldt","holidays","No day type (clear)"]].forEach(function(x){
     var el=$(x[0]),cur=el.value;
     el.innerHTML='<option value="">'+x[2]+'…</option>'+S.lists[x[1]].map(function(v){return"<option>"+esc(v)+"</option>"}).join("");
     el.value=cur});
@@ -380,13 +424,13 @@ $("lt").addEventListener("paste",function(e){
   rows.forEach(function(row,i){row.forEach(function(v,j){var c=c0+j;if(c>=LKEYS.length)return;cols[c][r0+i]=v.trim()})});
   commitCols(cols);
   say("Pasted "+rows.length+" row"+(rows.length===1?"":"s")+".")});
-function tab(n){["tracker","sheet","weekly","lists","backup"].forEach(function(k){$("v-"+k).hidden=k!==n;$("t-"+k).classList.toggle("on",k===n)});say("")}
-["tracker","sheet","weekly","lists","backup"].forEach(function(k){$("t-"+k).onclick=function(){tab(k)}});
+function tab(n){["tracker","sheet","weekly","dash","lists","backup"].forEach(function(k){$("v-"+k).hidden=k!==n;$("t-"+k).classList.toggle("on",k===n)});say("")}
+["tracker","sheet","weekly","dash","lists","backup"].forEach(function(k){$("t-"+k).onclick=function(){tab(k)}});
 $("golists").onclick=function(){tab("lists")};
 $("sprint").onclick=function(){window.print()};
 function calc(s){
   var t=S.ts[s]||{},a=hm(t.s),b=hm(t.e),br=(t.b===undefined||t.b==="")?1:num(t.b),r={t:t,a:a,b:b,br:br,w:null,e:0};
-  if(a!==null&&b!==null&&b>a){r.w=Math.max(0,(b-a)/60-br);r.e=Math.max(0,r.w-num(S.reg))}
+  if(a!==null&&b!==null&&b>a){r.w=Math.max(0,(b-a)/60-br);r.e=Math.max(0,r.w-nomOf(s))}
   return r}
 function hm(v){var m=/^(\d{1,2}):(\d{2})$/.exec(v||"");return m?(+m[1])*60+(+m[2]):null}
 $("sx").onclick=function(){
@@ -433,10 +477,11 @@ $("grid").addEventListener("change",function(e){
   o.h=t.value;
   save();render()});
 function dayCls(s){var h=((S.ts&&S.ts[s]&&S.ts[s].h)||"").trim();return/holiday/i.test(h)?"hol":/^(vl|sl)$/i.test(h)?"leave":""}
+function baseNom(s){var wd=parseIso(s).getDay();return(wd===0||wd===6)?0:num(S.reg)}
 function nomDef(s){
-  var wd=parseIso(s).getDay(),h=((S.ts[s]||{}).h||"").trim().toLowerCase();
-  if(wd===0||wd===6||/holiday/.test(h)||h==="vl"||h==="sl")return 0;
-  return num(S.reg)}
+  var h=((S.ts[s]||{}).h||"").trim().toLowerCase();
+  if(/holiday/.test(h)||h==="vl"||h==="sl")return 0;
+  return baseNom(s)}
 function nomOf(s){return S.nom&&S.nom[s]!==undefined?num(S.nom[s]):nomDef(s)}
 function dayLogged(s){var t=0;S.items.forEach(function(it){t+=num(it.log[s])});return t}
 function excessOf(s){return Math.max(0,dayLogged(s)-nomOf(s))}
@@ -461,14 +506,6 @@ function targetTotals(){
     if(!k||seen[k]||!m[k])return;seen[k]=1;rows.push([k,m[k][0],m[k][1]])});
   if(m[""])rows.push(["(no target)",m[""][0],m[""][1]]);
   return rows}
-function renderTargets(){
-  var rows=targetTotals(),te=0,tl=0;
-  var h='<div class="card"><h2>Man-hours by target</h2><table class="mini"><tr><th>Target</th><th>Estimated</th><th>Logged</th><th>Diff</th></tr>';
-  var df=function(a,b){var d=Math.round((b-a)*100)/100;return(d>0?"+":"")+d};
-  if(!rows.length)h+='<tr><td colspan="4" class="hint">Pick a target for a task and enter hours to see totals.</td></tr>';
-  rows.forEach(function(r){te+=r[1];tl+=r[2];h+="<tr><td>"+esc(r[0])+"</td><td>"+fmt(r[1])+"</td><td>"+fmt(r[2])+"</td><td>"+df(r[1],r[2])+"</td></tr>"});
-  if(rows.length)h+="<tr><th>Total</th><th>"+fmt(te)+"</th><th>"+fmt(tl)+"</th><th>"+df(te,tl)+"</th></tr>";
-  $("tsum").innerHTML=h+"</table></div>"}
 var MN=["January","February","March","April","May","June","July","August","September","October","November","December"];
 var P_START=23,P_END=22; // period runs from the 23rd of the previous month to the 22nd of the chosen month
 function periodRange(m,y){return[iso(new Date(y,m-1,P_START)),iso(new Date(y,m,P_END))]}
@@ -556,7 +593,7 @@ function wkModel(){
     if(!g[k]){g[k]={out:it.project||"",job:jobNo(it),desc:it.task||"",h:0};order.push(g[k])}
     g[k].h+=h});
   var auto={vl:0,sl:0,ob:0},cat={},tot=0;
-  days.forEach(function(d){var t=((S.ts[d]||{}).h||"").trim().toLowerCase();if(t==="vl"||t==="vacation leave")auto.vl+=num(S.reg);if(t==="sl"||t==="sick leave")auto.sl+=num(S.reg);if(t==="ob"||t==="official business")auto.ob+=num(S.reg)});
+  days.forEach(function(d){var t=((S.ts[d]||{}).h||"").trim().toLowerCase();if(t==="vl"||t==="vacation leave")auto.vl+=baseNom(d);if(t==="sl"||t==="sick leave")auto.sl+=baseNom(d);if(t==="ob"||t==="official business")auto.ob+=baseNom(d)});
   CATS.forEach(function(c){cat[c[0]]=m[c[0]]!==undefined?m[c[0]]:(auto[c[0]]||0)});
   order.forEach(function(r){tot+=r.h});
   return{ws:ws,days:days,m:m,rows:order,auto:auto,cat:cat,tot:tot}}
@@ -696,6 +733,98 @@ function renderHalves(){
   $("halves").innerHTML=h+'</tbody><tfoot><tr><td colspan="3" style="text-align:left">TOTAL LOGGED</td><td>'+fmt(ta)+"</td><td>"+fmt(tb)+"</td><td>"+fmt(ta+tb)+'</td></tr><tr><td colspan="3" style="text-align:left">NOMINAL (REGULAR) HRS</td><td>'+fmt(na)+"</td><td>"+fmt(nb)+"</td><td>"+fmt(na+nb)+'</td></tr><tr><td colspan="3" style="text-align:left">OT (EXCESS OVER REGULAR)</td><td class="'+cls(oa)+'">'+fmt(oa)+'</td><td class="'+cls(ob)+'">'+fmt(ob)+"</td><td>"+fmt(oa+ob)+"</td></tr></tfoot>"}
 $("thor").onchange=function(){S.thO=num(this.value);save();render()};
 $("thred").onchange=function(){S.thR=num(this.value);save();render()};
+function rangeDays(a,b){var out=[],d=parseIso(a),e=parseIso(b);for(;d<=e;d.setDate(d.getDate()+1))out.push(iso(d));return out}
+function sumLog(days){var t=0;days.forEach(function(d){t+=dayLogged(d)});return t}
+function sumOt(days){var t=0;days.forEach(function(d){t+=excessOf(d)});return t}
+function dashYear(){
+  if(S.dashYear)return S.dashYear;
+  var t=new Date(),y=t.getFullYear();return(t.getMonth()<3||(t.getMonth()===3&&t.getDate()<23))?y-1:y}
+var PAL=["#4472c4","#ed7d31","#12a150","#a855f7","#e5484d","#0ea5b7","#c9a227","#8b5e3c","#d6336c","#64748b","#7cb342","#5c6bc0","#f59e0b","#14b8a6","#ec4899","#84cc16"];
+function scopeColor(n){var i=-1;SCOPE.forEach(function(x,j){if(nrm(x[0])===nrm(n))i=j});
+  if(i<0){var h=0;String(n).split("").forEach(function(c){h=(h*31+c.charCodeAt(0))%997});i=h}
+  return PAL[i%PAL.length]}
+function donut(parts,total){
+  var r=15.9155,off=25,s='<svg viewBox="0 0 42 42" width="88" height="88" role="img" aria-label="Share of hours by work scope"><circle cx="21" cy="21" r="'+r+'" fill="none" stroke="var(--line)" stroke-width="6"/>';
+  parts.forEach(function(p){var pc=p.v/total*100;
+    s+='<circle cx="21" cy="21" r="'+r+'" fill="none" stroke="'+p.c+'" stroke-width="6" stroke-dasharray="'+pc+" "+(100-pc)+'" stroke-dashoffset="'+off+'"><title>'+esc(p.n)+": "+fmt(p.v)+" hrs</title></circle>";off-=pc});
+  return s+'<text x="21" y="23" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor">'+fmt(total)+"</text></svg>"}
+function dashPart(name,a,b){
+  var days=rangeDays(a,b),est=0,proj={},T={},cnt={wfo:0,wfh:0,vl:0,sl:0,hol:0};
+  days.forEach(function(d){var h=((S.ts[d]||{}).h||"").trim().toLowerCase();
+    if(h==="wfo")cnt.wfo++;else if(h==="wfh")cnt.wfh++;else if(h==="vl")cnt.vl++;else if(h==="sl")cnt.sl++;else if(/holiday/.test(h))cnt.hol++});
+  S.items.forEach(function(it){
+    var l=0,e=0;days.forEach(function(d){l+=num(it.log[d]);e+=num(it.est[d])});est+=e;if(!l&&!e)return;
+    var pk=it.project||"(no project)",sk=it.task||"(no scope)";
+    var P=proj[pk]=proj[pk]||{l:0,e:0,s:{}};P.l+=l;P.e+=e;
+    var X=P.s[sk]=P.s[sk]||{l:0,e:0};X.l+=l;X.e+=e;
+    var tgk=it.target||"(no target)",Tt=T[tgk]=T[tgk]||{l:0,e:0};Tt.l+=l;Tt.e+=e});
+  var log=sumLog(days),ot=sumOt(days),worked=days.filter(function(d){return dayLogged(d)>0}).length;
+  var kp=function(v,l){return'<div class="kpi"><b>'+v+"</b><span>"+l+"</span></div>"};
+  var df=Math.round((log-est)*100)/100;
+  var h='<div class="card"><h2>'+name+' <span class="hint">'+a+" – "+b+"</span></h2>";
+  h+='<div class="kpis">'+kp(fmt(log)||0,"Logged hrs")+kp(fmt(est)||0,"Estimated hrs")+kp((df>0?"+":"")+df,"Logged − estimated")+kp(fmt(ot)||0,"OT hrs")+kp(worked,"Days logged")+kp(cnt.vl,"VL days")+kp(cnt.sl,"SL days")+"</div>";
+  var tg=Object.keys(T).sort(function(x,y){return T[y].l-T[x].l});
+  if(tg.length){
+    var tmax=T[tg[0]].l||1,tl=0,te=0;
+    h+='<table class="mini"><caption>Man-hours by target</caption><tr><th>Target</th><th>Estimated</th><th>Logged</th><th>Diff</th></tr>';
+    tg.forEach(function(k){var d=Math.round((T[k].l-T[k].e)*100)/100;tl+=T[k].l;te+=T[k].e;
+      h+="<tr><td>"+esc(k)+"</td><td>"+fmt(T[k].e)+"</td><td>"+fmt(T[k].l)+'<div class="mb"><i style="width:'+Math.round(T[k].l/tmax*100)+'%;background:var(--head)"></i></div></td><td>'+(d>0?"+":"")+d+"</td></tr>"});
+    h+="<tr><th>Total</th><th>"+fmt(te)+"</th><th>"+fmt(tl)+"</th><th>"+(Math.round((tl-te)*100)/100)+"</th></tr></table>"}
+  var pk=Object.keys(proj).sort(function(x,y){return proj[y].l-proj[x].l});
+  if(!pk.length)return h+'<p class="hint">No hours logged in this period yet.</p></div>';
+  pk.forEach(function(n){
+    var P=proj[n],sk=Object.keys(P.s).sort(function(x,y){return P.s[y].l-P.s[x].l}),max=P.s[sk[0]].l||1;
+    var parts=sk.filter(function(k){return P.s[k].l>0}).map(function(k){return{n:k,v:P.s[k].l,c:scopeColor(k)}});
+    h+='<div class="proj"><div>'+(parts.length?donut(parts,P.l):"")+'</div><div class="pt"><div class="ph"><b>'+esc(n)+'</b> <span class="hint">'+fmt(P.l)+" hrs logged · "+fmt(P.e)+' est.</span></div><table class="mini"><tr><th>Work scope</th><th>Logged</th><th>Estimated</th><th>Diff</th></tr>';
+    sk.forEach(function(k){var X=P.s[k],c=scopeColor(k),d=Math.round((X.l-X.e)*100)/100;
+      h+='<tr><td><i class="sw" style="background:'+c+'"></i>'+esc(k)+"</td><td>"+fmt(X.l)+'<div class="mb"><i style="width:'+Math.round(X.l/max*100)+"%;background:"+c+'"></i></div></td><td>'+fmt(X.e)+"</td><td>"+(d>0?"+":"")+d+"</td></tr>"});
+    h+='<tr><th>Total</th><th>'+fmt(P.l)+"</th><th>"+fmt(P.e)+"</th><th>"+(Math.round((P.l-P.e)*100)/100)+"</th></tr></table></div></div>"});
+  return h+"</div>"}
+function renderDash(){
+  var y=dashYear(),v=S.dashView||"both";setv("dyear",y);setv("dview",v);
+  $("dlabel").textContent="Midterm: Apr 23 – Oct 22 · Finals: Oct 23 – Mar 22 (next year)";
+  $("dash").className="lists"+(v==="both"?"":" single");
+  $("dash").innerHTML=(v!=="fin"?dashPart("Midterm",y+"-04-23",y+"-10-22"):"")+(v!=="mid"?dashPart("Finals",y+"-10-23",(y+1)+"-03-22"):"")}
+$("dview").onchange=function(){S.dashView=this.value;save();render()};
+$("dyear").onchange=function(){var v=parseInt(this.value,10);if(v>1999&&v<2100){S.dashYear=v;save();render()}};
+var calSel={};
+function renderCal(){
+  var mo={},h="";
+  S.dates.forEach(function(d){(mo[d.slice(0,7)]=mo[d.slice(0,7)]||[]).push(d)});
+  Object.keys(mo).sort().forEach(function(k){
+    var first=parseIso(mo[k][0]);
+    h+='<div class="ml">'+MN[first.getMonth()]+" "+first.getFullYear()+'</div><div class="calg">';
+    "SMTWTFS".split("").forEach(function(x){h+='<div class="dh">'+x+"</div>"});
+    for(var i=0;i<first.getDay();i++)h+="<div></div>";
+    mo[k].forEach(function(d){
+      var dt=parseIso(d),wd=dt.getDay(),ov=S.nom&&S.nom[d]!==undefined,t=(S.ts[d]||{}).h||"";
+      h+='<button type="button" class="cd'+(calSel[d]?" sel":"")+((wd===0||wd===6)?" wk":"")+'" data-cd="'+d+'" title="'+d+(t?" · "+esc(t):"")+(ov?" · nominal "+S.nom[d]+"h":"")+'">'+dt.getDate()+(ov?"<small>"+S.nom[d]+"h</small>":t?"<small>"+esc(t.slice(0,5))+"</small>":"")+"</button>"});
+    h+="</div>"});
+  $("calgrid").innerHTML=h||'<span class="hint">No dates in range.</span>';
+  var n=Object.keys(calSel).length;$("calcount").textContent=n?n+" selected":"Click days to select"}
+function calDays(){var d=Object.keys(calSel);if(!d.length)say("Select some days on the calendar first.");return d}
+$("calbtn").onclick=function(e){e.stopPropagation();var p=$("calpop");p.hidden=!p.hidden;if(!p.hidden){fillSelects();renderCal()}};
+document.addEventListener("click",function(){$("calpop").hidden=true});
+$("calpop").addEventListener("click",function(e){
+  e.stopPropagation();
+  var b=e.target.closest("[data-cd]");if(!b)return;
+  var d=b.dataset.cd;if(calSel[d])delete calSel[d];else calSel[d]=true;renderCal()});
+function calPick(f){calSel={};S.dates.forEach(function(d){var w=parseIso(d).getDay();if(f(w))calSel[d]=true});renderCal()}
+$("calwk").onclick=function(){calPick(function(w){return w>0&&w<6})};
+$("calwe").onclick=function(){calPick(function(w){return w===0||w===6})};
+$("calall").onclick=function(){calPick(function(){return true})};
+$("calclr").onclick=function(){calSel={};renderCal()};
+$("calnomgo").onclick=function(){
+  var v=$("calnom").value;if(v==="")return say("Enter the nominal hours first.");
+  var ds=calDays();if(!ds.length)return;S.nom=S.nom||{};ds.forEach(function(d){S.nom[d]=num(v)});
+  save();render();say("Nominal hours set to "+num(v)+" on "+ds.length+" day"+(ds.length===1?"":"s")+".")};
+$("calnomrs").onclick=function(){
+  var ds=calDays();if(!ds.length)return;S.nom=S.nom||{};ds.forEach(function(d){delete S.nom[d]});
+  save();render();say("Nominal hours reset to the default on "+ds.length+" day"+(ds.length===1?"":"s")+".")};
+$("caldtgo").onclick=function(){
+  var ds=calDays();if(!ds.length)return;var v=$("caldt").value;
+  ds.forEach(function(d){var o=S.ts[d]=S.ts[d]||{};o.h=v});
+  save();render();say((v?"Day type "+v:"Day type cleared")+" on "+ds.length+" day"+(ds.length===1?"":"s")+".")};
 function syncBar(){if(S.dates.length){$("start").value=S.dates[0];$("days").value=S.dates.length}}
 load();ensureLists();
 buildPeriod();

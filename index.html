@@ -91,6 +91,7 @@ textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;b
 .proj .pt{flex:1;min-width:240px}.proj .ph{margin-bottom:4px}
 .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .mb{height:5px;margin-top:3px;border-radius:3px;background:var(--line);overflow:hidden}.mb i{display:block;height:100%}
+.mini tr.sub td{color:var(--mute);font-size:13px}
 .hint{color:var(--mute)}
 .mini{width:100%;border-collapse:collapse}
 .mini th,.mini td{padding:5px 10px;text-align:left;border:1px solid var(--line)}
@@ -755,8 +756,9 @@ function dashPart(name,a,b){
   S.items.forEach(function(it){
     var l=0,e=0;days.forEach(function(d){l+=num(it.log[d]);e+=num(it.est[d])});est+=e;if(!l&&!e)return;
     var pk=it.project||"(no project)",sk=it.task||"(no scope)";
-    var P=proj[pk]=proj[pk]||{l:0,e:0,s:{}};P.l+=l;P.e+=e;
-    var X=P.s[sk]=P.s[sk]||{l:0,e:0};X.l+=l;X.e+=e;
+    var P=proj[pk]=proj[pk]||{l:0,e:0,o:0,s:{}};P.l+=l;P.e+=e;
+    var ds=String(it.desc||""),ty=/^rev/i.test(ds)?"a":/^che/i.test(ds)?"c":/^(cre|new)/i.test(ds)?"d":"o";
+    var X=P.s[sk]=P.s[sk]||{l:0,e:0,a:0,c:0,d:0,o:0,ea:0,ec:0,ed:0,eo:0};X.l+=l;X.e+=e;X[ty]+=l;X["e"+ty]+=e;if(ty==="o")P.o+=l;
     var tgk=it.target||"(no target)",Tt=T[tgk]=T[tgk]||{l:0,e:0};Tt.l+=l;Tt.e+=e});
   var log=sumLog(days),ot=sumOt(days),worked=days.filter(function(d){return dayLogged(d)>0}).length;
   var kp=function(v,l){return'<div class="kpi"><b>'+v+"</b><span>"+l+"</span></div>"};
@@ -773,12 +775,15 @@ function dashPart(name,a,b){
   var pk=Object.keys(proj).sort(function(x,y){return proj[y].l-proj[x].l});
   if(!pk.length)return h+'<p class="hint">No hours logged in this period yet.</p></div>';
   pk.forEach(function(n){
-    var P=proj[n],sk=Object.keys(P.s).sort(function(x,y){return P.s[y].l-P.s[x].l}),max=P.s[sk[0]].l||1;
+    var P=proj[n],sk=Object.keys(P.s).sort(function(x,y){return P.s[y].l-P.s[x].l}),max=P.s[sk[0]].l||1,hasO=P.o>0;
     var parts=sk.filter(function(k){return P.s[k].l>0}).map(function(k){return{n:k,v:P.s[k].l,c:scopeColor(k)}});
     h+='<div class="proj"><div>'+(parts.length?donut(parts,P.l):"")+'</div><div class="pt"><div class="ph"><b>'+esc(n)+'</b> <span class="hint">'+fmt(P.l)+" hrs logged · "+fmt(P.e)+' est.</span></div><table class="mini"><tr><th>Work scope</th><th>Logged</th><th>Estimated</th><th>Diff</th></tr>';
-    sk.forEach(function(k){var X=P.s[k],c=scopeColor(k),d=Math.round((X.l-X.e)*100)/100;
-      h+='<tr><td><i class="sw" style="background:'+c+'"></i>'+esc(k)+"</td><td>"+fmt(X.l)+'<div class="mb"><i style="width:'+Math.round(X.l/max*100)+"%;background:"+c+'"></i></div></td><td>'+fmt(X.e)+"</td><td>"+(d>0?"+":"")+d+"</td></tr>"});
-    h+='<tr><th>Total</th><th>'+fmt(P.l)+"</th><th>"+fmt(P.e)+"</th><th>"+(Math.round((P.l-P.e)*100)/100)+"</th></tr></table></div></div>"});
+    var TY=[["a","Revision"],["c","Checking"],["d","Creation"],["o","Other"]],sgn=function(v){v=Math.round(v*100)/100;return(v>0?"+":"")+v};
+    sk.forEach(function(k){var X=P.s[k],c=scopeColor(k);
+      h+='<tr><td><i class="sw" style="background:'+c+'"></i><b>'+esc(k)+"</b></td><td><b>"+fmt(X.l)+'</b><div class="mb"><i style="width:'+Math.round(X.l/max*100)+"%;background:"+c+'"></i></div></td><td>'+fmt(X.e)+"</td><td>"+sgn(X.l-X.e)+"</td></tr>";
+      TY.forEach(function(t){var lv=X[t[0]],ev=X["e"+t[0]];if(!lv&&!ev)return;
+        h+='<tr class="sub"><td style="padding-left:30px">– '+t[1]+"</td><td>"+fmt(lv)+"</td><td>"+fmt(ev)+"</td><td>"+sgn(lv-ev)+"</td></tr>"})});
+    h+="<tr><th>Total</th><th>"+fmt(P.l)+"</th><th>"+fmt(P.e)+"</th><th>"+sgn(P.l-P.e)+"</th></tr></table></div></div>"});
   return h+"</div>"}
 function renderDash(){
   var y=dashYear(),v=S.dashView||"both";setv("dyear",y);setv("dview",v);

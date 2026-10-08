@@ -195,6 +195,7 @@ table.rep tfoot td{background:var(--task2);font-weight:600}
   <div class="lists" id="dash"></div>
   <div class="bar">
     <strong style="padding-bottom:6px">Logged time and OT by half-month</strong><span class="sp"></span>
+    <label>From<input type="date" id="hfrom"></label><label>To<input type="date" id="hto"></label><button id="hreset">Use period above</button>
     <label>OT limit from (hrs)<input type="number" id="thor" step="0.5" min="0" style="width:90px"></label>
     <label>OT warning from (hrs)<input type="number" id="thred" step="0.5" min="0" style="width:90px"></label>
   </div>
@@ -720,12 +721,16 @@ $("rfile").onchange=function(e){
 $("rgo").onclick=async function(){
   try{var o=await readCode($("rcode").value,$("rpass").value);if(!confirm("Replace the data in this browser with this backup?"))return;applyState(o);say("Backup restored.")}
   catch(err){say("Could not restore: "+err.message)}};
+function hDates(){
+  var a=S.hFrom,b=S.hTo;
+  if(a&&b&&a<=b){var l=rangeDays(a,b);return l.length>400?l.slice(0,400):l}
+  return S.dates}
 function renderHalves(){
-  var o=S.thO===undefined?15:S.thO,r=S.thR===undefined?22.5:S.thR;
-  setv("thor",o);setv("thred",r);
+  var o=S.thO===undefined?15:S.thO,r=S.thR===undefined?22.5:S.thR,hd=hDates();
+  setv("thor",o);setv("thred",r);setv("hfrom",hd[0]||"");setv("hto",hd[hd.length-1]||"");
   var a=[],b=[],g={},order=[];
-  S.dates.forEach(function(d){var n=parseIso(d).getDate();(n>=23||n<=7?a:b).push(d)});
-  var span=function(l){if(!l.length)return"–";var x=parseIso(l[0]),y=parseIso(l[l.length-1]);return(x.getMonth()+1)+"/"+x.getDate()+" – "+(y.getMonth()+1)+"/"+y.getDate()};
+  hd.forEach(function(d){var n=parseIso(d).getDate();(n>=23||n<=7?a:b).push(d)});
+  var span=function(l,fb){if(!l.length)return"–";if(hd.length>40)return fb;var x=parseIso(l[0]),y=parseIso(l[l.length-1]);return(x.getMonth()+1)+"/"+x.getDate()+" – "+(y.getMonth()+1)+"/"+y.getDate()};
   var cls=function(v){return v>=r&&r>0?"crit":v>=o&&o>0?"warn":""};
   var sum=function(l,f){var t=0;l.forEach(function(d){t+=f(d)});return t};
   S.items.forEach(function(it){
@@ -733,12 +738,16 @@ function renderHalves(){
     if(!g[k]){g[k]={it:it,a:0,b:0};order.push(g[k])}
     a.forEach(function(d){g[k].a+=num(it.log[d])});b.forEach(function(d){g[k].b+=num(it.log[d])})});
   order=order.filter(function(x){return x.a||x.b});
-  var ta=0,tb=0,h="<caption>Logged hours · OT limit from "+o+" hrs, warning from "+r+" hrs</caption><thead><tr><th>Project</th><th>Task</th><th>Description</th><th>1st cut-off<br><small>"+span(a)+"</small></th><th>2nd cut-off<br><small>"+span(b)+"</small></th><th>Total</th></tr></thead><tbody>";
+  var ta=0,tb=0,h="<caption>Logged hours · OT limit from "+o+" hrs, warning from "+r+" hrs</caption><thead><tr><th>Project</th><th>Task</th><th>Description</th><th>1st cut-off<br><small>"+span(a,"23rd – 7th")+"</small></th><th>2nd cut-off<br><small>"+span(b,"8th – 22nd")+"</small></th><th>Total</th></tr></thead><tbody>";
   if(!order.length)h+='<tr><td colspan="6" class="hint" style="padding:18px">No logged hours in this period yet.</td></tr>';
   order.forEach(function(x){ta+=x.a;tb+=x.b;
     h+='<tr><td class="l">'+esc(x.it.project||"")+'</td><td class="l">'+esc(x.it.task)+'</td><td class="l">'+esc(x.it.desc)+"</td><td>"+fmt(x.a)+"</td><td>"+fmt(x.b)+"</td><td>"+fmt(x.a+x.b)+"</td></tr>"});
   var na=sum(a,nomOf),nb=sum(b,nomOf),oa=sum(a,excessOf),ob=sum(b,excessOf);
   $("halves").innerHTML=h+'</tbody><tfoot><tr><td colspan="3" style="text-align:left">TOTAL LOGGED</td><td>'+fmt(ta)+"</td><td>"+fmt(tb)+"</td><td>"+fmt(ta+tb)+'</td></tr><tr><td colspan="3" style="text-align:left">NOMINAL (REGULAR) HRS</td><td>'+fmt(na)+"</td><td>"+fmt(nb)+"</td><td>"+fmt(na+nb)+'</td></tr><tr><td colspan="3" style="text-align:left">OT (EXCESS OVER REGULAR)</td><td class="'+cls(oa)+'">'+fmt(oa)+'</td><td class="'+cls(ob)+'">'+fmt(ob)+"</td><td>"+fmt(oa+ob)+"</td></tr></tfoot>"}
+function hSet(){if(S.hFrom&&S.hTo&&S.hFrom>S.hTo)say("The end date is before the start date.");else say("");save();render()}
+$("hfrom").onchange=function(){S.hFrom=this.value;if(!S.hTo)S.hTo=S.dates[S.dates.length-1]||this.value;hSet()};
+$("hto").onchange=function(){S.hTo=this.value;if(!S.hFrom)S.hFrom=S.dates[0]||this.value;hSet()};
+$("hreset").onclick=function(){delete S.hFrom;delete S.hTo;say("");save();render()};
 $("thor").onchange=function(){S.thO=num(this.value);save();render()};
 $("thred").onchange=function(){S.thR=num(this.value);save();render()};
 function rangeDays(a,b){var out=[],d=parseIso(a),e=parseIso(b);for(;d<=e;d.setDate(d.getDate()+1))out.push(iso(d));return out}

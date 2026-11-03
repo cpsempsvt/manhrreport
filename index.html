@@ -2046,13 +2046,39 @@ td.c input:focus, td.c.has input:focus, td.c.has.e input:focus, td.c.has.l input
 .otdet { margin: 0 0 10px; }
 .otdet > summary { cursor: pointer; color: var(--mute); font-size: 13px; padding: 2px 0; }
 .otdet[open] > summary { margin-bottom: 8px; }
+
+/* sign-in and personal link */
+#whoami { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+#whoami .wname { color: #fff; font-weight: 600; }
+#whoami button { min-height: 28px; padding: 2px 12px; }
+#signin { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; background: rgba(10, 20, 30, 0.55); padding: 16px; }
+#signin .sbox { width: min(420px, 100%); background: var(--panel); color: var(--ink); border-radius: 12px; padding: 22px; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); display: grid; gap: 12px; }
+#signin h2 { margin: 0; font-size: 18px; }
+#signin p { margin: 0; }
+#signin label { display: grid; gap: 4px; font-size: 12px; color: var(--mute); }
+#signin input { min-height: 38px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; background: var(--panel); color: var(--ink); font-size: 14px; }
+#signin .row { display: flex; gap: 8px; }
+#fblink { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--task2); color: var(--ink); }
+#whoami button, #whoami button.primary { background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.5); color: #fff; }
+#whoami button:hover { background: rgba(255, 255, 255, 0.28); }
+button.lnk { border: 0; background: none; text-decoration: underline; color: var(--mute); min-height: 0; padding: 4px 6px; }
+#signin .sp { flex: 1; }
+
+#whoami .wsaved { color: #c9d8e0; font-size: 12px; }
+@media (max-width: 640px) { #whoami { margin-left: 0; flex-wrap: wrap; } #whoami .wsaved { display: none; } }
+
+#mygroup { margin-left: auto; min-height: 30px; border-radius: 4px; border: 1px solid rgba(255,255,255,.5); background: rgba(255,255,255,.16); color: #fff; padding: 2px 8px; }
+#mygroup option { color: #1d2327; }
+#whoami { margin-left: 0; }
+#gt td.l { text-align: left; }
+#gt input { width: 100%; min-width: 150px; }
 </style>
   </head>
   <body>
     <!-- ===== PAGE HEADER AND TAB BAR ===== -->
     <header>
       <h1>Man-Hour Tracker</h1>
-      <p>Type hours straight into the grid, or import your Excel sheet. Data stays in this browser.</p>
+      <p>Type hours straight into the grid, or import your Excel sheet. Data stays in this browser unless you sign in.</p><select id="mygroup" aria-label="My group" title="Your group: decides which activities the Task dropdown shows"><option value="">My group…</option><option>Piping</option><option>Electrical</option><option>Mechanical</option></select><span id="whoami"></span>
     </header>
 
     <nav class="tabs">
@@ -2064,6 +2090,7 @@ td.c input:focus, td.c.has input:focus, td.c.has.e input:focus, td.c.has.l input
       <button id="t-lists">Lists</button>
       <button id="t-team">Team</button>
       <button id="t-backup">Backup</button>
+      <button id="t-admin" hidden>Admin</button>
     </nav>
     <div class="bar" id="pbar">
       <label
@@ -2348,7 +2375,7 @@ td.c input:focus, td.c.has input:focus, td.c.has.e input:focus, td.c.has.l input
       <div class="hint" style="padding: 0 20px 24px">
         Actual MH is the logged time from the Tracker for this project, added up by work scope (the Tracker
         task name). Tracker tasks that don't match any row are totalled under "Other work not listed above".
-        Plan MH, efficiency and status are typed in. The Tracking column compares Actual with Plan: On track,
+        Plan MH is the estimated time from the Tracker tab (it updates by itself); efficiency and status are typed in. The Tracking column compares Actual with Plan: On track,
         Near plan (at or above the warning percentage) or Over plan. When tasks of a project have a Target set
         on the Tracker, one table is shown per Target, each counting only that Target’s hours; with no Target
         set you get the single table.
@@ -2386,6 +2413,11 @@ td.c input:focus, td.c.has input:focus, td.c.has.e input:focus, td.c.has.l input
     </section>
 
     <!-- ===== TEAM TAB ===== -->
+    <!-- ===== ADMIN TAB (only shown after the admin signs in) ===== -->
+    <section id="v-admin" hidden>
+      <div class="lists"><div class="card" id="adminbox" style="grid-column: 1 / -1"></div></div>
+    </section>
+
     <section id="v-team" hidden>
       <div class="bar">
         <input type="file" id="tqf" accept=".json,application/json" multiple hidden /><input
@@ -2528,16 +2560,27 @@ td.c input:focus, td.c.has input:focus, td.c.has.e input:focus, td.c.has.l input
     <!-- ===== LISTS TAB ===== -->
     <section id="v-lists" hidden>
       <div class="bar">
-        <span class="hint"
+        <button id="listpub" class="primary" hidden>Publish these lists to everyone</button>
+        <span class="hint" id="listhint"
           >These fill the dropdowns. Paste a column or a block copied from Excel into any cell, or type items
           one per cell. Clear a cell to remove an item. Changes save when you leave a cell.</span
         >
       </div>
       <div class="wrap"><table id="lt" class="rep"></table></div>
+      <div class="bar"><span class="hint"><b>Activities by group.</b> The Task dropdown shows the activities of your own group (chosen at the top), plus TM Concerns and Official Business. Piping activities have a code (1-7) used in the weekly report.</span></div>
+      <div class="wrap"><table id="gt" class="rep"></table></div>
     </section>
 
     <!-- Scripts run top to bottom and share one global scope. Keep this order. -->
 <script>
+// ========================================================================
+// FIREBASE SETTINGS (optional). Paste your project's web config here, or leave
+// null and paste it into the Backup tab of the running app instead.
+// Example:
+//   var FIREBASE_CONFIG = { apiKey: "...", authDomain: "x.firebaseapp.com", projectId: "x", appId: "..." };
+// ========================================================================
+var FIREBASE_CONFIG = null;
+
 // Man-hour tracker, part 1 of 12. See README.md for how the files fit together.
 // Data model (saved in the browser under KEY below):
 //   S.dates   the days shown on the Tracker
@@ -3436,10 +3479,12 @@ function importDaily(rows) {
     }
   });
   ensureLists();
-  if (S.lists.tasks.indexOf(DAILY_TASK) < 0) S.lists.tasks.push(DAILY_TASK);
-  Object.keys(allTxt).forEach(function (t) {
-    if (S.lists.tasks.indexOf(t) < 0) S.lists.tasks.push(t);
-  });
+  if (!LISTS_LOCKED) {
+    if (S.lists.tasks.indexOf(DAILY_TASK) < 0) S.lists.tasks.push(DAILY_TASK);
+    Object.keys(allTxt).forEach(function (t) {
+      if (S.lists.tasks.indexOf(t) < 0) S.lists.tasks.push(t);
+    });
+  }
   // show whole 23rd-to-22nd periods that contain the imported days
   var from = periodOf(lmin)[0],
     to = periodOf(lmax)[1];
@@ -3736,6 +3781,28 @@ $("exp").onclick = function () {
 // ========================================================================
 // LISTS TAB: dropdown choices (projects, tasks, descriptions, day types, targets)
 // ========================================================================
+// Activities by group (the "scope of work" lists). Piping activities also carry a code (1-7).
+var GKEYS = ["Piping", "Electrical", "Mechanical", "TM Concerns", "Official Business"];
+var DISC = ["Piping", "Electrical", "Mechanical"]; // the groups a person belongs to
+var DEF_GROUPS = {
+  Piping: ["Equipment Modeling", "Pipe Modeling", "Pipe Support Modeling", "Structure Modeling", "Floor Modeling", "Equipment Layout", "Foundation Layout", "Piping Layout", "Pipe Support Layout", "Spool Drawings", "Spool Detail", "Support Detail Drawings", "P&ID/ Flowsheet", "2D-CAD Work", "Other 3D Work", "Others"],
+  Electrical: ["Single Line Diagram", "Wiring System Diagram", "Instrumentation Flow Sheet", "Control System Diagram", "Panel Board Layout", "Panel Board Outline Drawings", "Panel Board Specification Sheet", "Cable Rack Route Plan", "Cable List & Size Calculations", "Input/Output List", "Instrumentation Hookup Drawings", "Instrumentation Specification Sheet", "Instrumentation and Contact Plot Plan", "Electrical Construction Specification Sheet", "Lightning Rod Diagram", "Lighting and Power Layout", "Equipment Grounding Pole Layout Diagram", "Vendor Documentation", "Screen Design", "PLC Programming", "System Configuration Diagram", "BOQ", "Panel Board Specification", "Operation Block Diagram", "PMD"],
+  Mechanical: ["Assembly Modelling", "Parts Modelling", "Assembly Drawings", "Fabrication/Detail Drawings", "Calculation/Analysis", "PMD"],
+  "TM Concerns": ["Health Webinar/seminar", "Meetings (Internal/Monthly report/etc)", "HORENSO Training", "Technical Training", "Dispatch Orientation", "Meetings with Concurrent members", "TMS Deliberation", "Newly Hire Introduction", "Updating of Progress", "JE1 Event (JFETM)", "JE1 Event (Japan)", "Training/orientations", "TM Concern Meeting", "Meeting"],
+  "Official Business": ["Annual Physical Examination", "Company Anniversary", "Company Holiday", "Passport Renewal", "PRC License Renewal", "Team Building", "Work suspension due to calamity", "Year-end Party"],
+};
+function defGroups() {
+  return JSON.parse(JSON.stringify(DEF_GROUPS));
+}
+function defCodes() {
+  var o = {};
+  SCOPE.forEach(function (x) {
+    o[x[0]] = x[1];
+  });
+  return o;
+}
+// true when the admin has published master lists: people can only pick from them
+var LISTS_LOCKED = false;
 function ensureLists() {
   var fresh = !S.lists;
   S.lists = S.lists || {};
@@ -3768,8 +3835,20 @@ function ensureLists() {
     S.scopev1 = 1;
   }
   S.lists.targets = S.lists.targets || ["Target 1", "Target 2", "Target 3"];
+  if (!S.lists.groups) S.lists.groups = defGroups();
+  if (!S.lists.pcodes) S.lists.pcodes = defCodes();
+  GKEYS.forEach(function (g) {
+    S.lists.groups[g] = S.lists.groups[g] || [];
+  });
+  S.group = S.group || "";
+  if (!LISTS_LOCKED)
+    GKEYS.forEach(function (g) {
+      S.lists.groups[g].forEach(function (t) {
+        if (S.lists.tasks.indexOf(t) < 0) S.lists.tasks.push(t);
+      });
+    });
   var add = function (k, v) {
-    if (v && S.lists[k].indexOf(v) < 0) S.lists[k].push(v);
+    if (!LISTS_LOCKED && v && S.lists[k].indexOf(v) < 0) S.lists[k].push(v);
   };
   S.items.forEach(function (it) {
     add("projects", it.project);
@@ -3790,6 +3869,7 @@ function fillSelects() {
   ].forEach(function (x) {
     var el = $(x[0]),
       cur = el.value;
+    if (x[0] === "nt") return fillTaskSelect(el, cur);
     el.innerHTML =
       '<option value="">' +
       x[2] +
@@ -3802,22 +3882,48 @@ function fillSelects() {
     el.value = cur;
   });
 }
+function fillTaskSelect(el, cur) {
+  var o = function (v) {
+      return "<option>" + esc(v) + "</option>";
+    },
+    seen = {},
+    h = '<option value="">Task…</option>',
+    show = S.group && DISC.indexOf(S.group) >= 0 ? [S.group, "TM Concerns", "Official Business"] : GKEYS;
+  show.forEach(function (g) {
+    var l = (S.lists.groups[g] || []).filter(Boolean);
+    l.forEach(function (t) {
+      seen[t] = 1;
+    });
+    if (l.length) h += '<optgroup label="' + esc(g) + '">' + l.map(o).join("") + "</optgroup>";
+  });
+  // tasks that are in no group (e.g. the weekly-report scope names, or older entries) still show up
+  GKEYS.forEach(function (g) {
+    (S.lists.groups[g] || []).forEach(function (t) {
+      seen[t] = 1;
+    });
+  });
+  var rest = (S.lists.tasks || []).filter(function (t) {
+    return t && !seen[t];
+  });
+  if (rest.length) h += '<optgroup label="Other">' + rest.map(o).join("") + "</optgroup>";
+  el.innerHTML = h;
+  el.value = cur;
+}
 var LKEYS = [
   ["projects", "Projects"],
-  ["tasks", "Task names"],
   ["descs", "Descriptions"],
   ["holidays", "Day types"],
   ["targets", "Targets"],
 ];
 function buildListsTable() {
   var n = Math.max(
-    15,
+    LISTS_LOCKED ? 1 : 15,
     Math.max.apply(
       null,
       LKEYS.map(function (k) {
         return S.lists[k[0]].length;
       }),
-    ) + 10,
+    ) + (LISTS_LOCKED ? 0 : 10),
   );
   var h =
     "<thead><tr>" +
@@ -3828,6 +3934,7 @@ function buildListsTable() {
   for (var r = 0; r < n; r++) {
     h += "<tr>";
     LKEYS.forEach(function (k, c) {
+      if (LISTS_LOCKED) return (h += "<td>" + esc(S.lists[k[0]][r] || "") + "</td>");
       h +=
         '<td><input type="text" data-c="' +
         c +
@@ -3846,6 +3953,8 @@ function buildListsTable() {
   $("lt").innerHTML = h + "</tbody>";
 }
 function renderLists() {
+  if (!$("gt").contains(document.activeElement)) buildGroupsTable();
+  syncGroupSelect();
   if (!$("lt").contains(document.activeElement)) buildListsTable();
 }
 function readCols() {
@@ -3903,6 +4012,104 @@ $("lt").addEventListener("paste", function (e) {
   commitCols(cols);
   say("Pasted " + rows.length + " row" + (rows.length === 1 ? "" : "s") + ".");
 });
+// ---- activities by group table ----
+var GCOLS = ["Piping", "Code", "Electrical", "Mechanical", "TM Concerns", "Official Business"];
+function gtCols() {
+  var g = S.lists.groups,
+    pc = S.lists.pcodes || {};
+  return [
+    g.Piping.slice(),
+    g.Piping.map(function (t) {
+      return pc[t] === undefined ? "" : pc[t];
+    }),
+    g.Electrical.slice(),
+    g.Mechanical.slice(),
+    g["TM Concerns"].slice(),
+    g["Official Business"].slice(),
+  ];
+}
+function buildGroupsTable() {
+  var el = $("gt");
+  if (!el) return;
+  var cols = gtCols(),
+    n = Math.max.apply(null, cols.map(function (c) { return c.length; })) + (LISTS_LOCKED ? 0 : 8),
+    h = "<thead><tr>" + GCOLS.map(function (k) { return "<th>" + (k === "Code" ? "Code" : k + " activities") + "</th>"; }).join("") + "</tr></thead><tbody>";
+  for (var r = 0; r < n; r++) {
+    h += "<tr>";
+    cols.forEach(function (c, i) {
+      var v = c[r] === undefined ? "" : c[r];
+      if (LISTS_LOCKED) h += '<td class="' + (i === 1 ? "" : "l") + '">' + esc(v) + "</td>";
+      else h += '<td><input type="text" data-gc="' + i + '" data-r="' + r + '" value="' + esc(v) + '" aria-label="' + GCOLS[i] + " row " + (r + 1) + '"' + (i === 1 ? ' style="width:56px;text-align:center"' : "") + "></td>";
+    });
+    h += "</tr>";
+  }
+  el.innerHTML = h + "</tbody>";
+}
+function readGcols() {
+  var cols = GCOLS.map(function () { return []; });
+  document.querySelectorAll("#gt input").forEach(function (i) {
+    cols[+i.dataset.gc][+i.dataset.r] = i.value;
+  });
+  return cols;
+}
+function commitGcols(cols) {
+  var clean = function (a) {
+    var seen = {}, out = [];
+    (a || []).forEach(function (v) {
+      v = String(v || "").trim();
+      if (v && !seen[v]) { seen[v] = 1; out.push(v); }
+    });
+    return out;
+  };
+  var pc = {};
+  (cols[0] || []).forEach(function (t, i) {
+    t = String(t || "").trim();
+    var c = String((cols[1] || [])[i] || "").trim();
+    if (t && c !== "") pc[t] = isNaN(+c) ? c : +c;
+  });
+  S.lists.groups.Piping = clean(cols[0]);
+  S.lists.groups.Electrical = clean(cols[2]);
+  S.lists.groups.Mechanical = clean(cols[3]);
+  S.lists.groups["TM Concerns"] = clean(cols[4]);
+  S.lists.groups["Official Business"] = clean(cols[5]);
+  S.lists.pcodes = pc;
+  GKEYS.forEach(function (g) {
+    S.lists.groups[g].forEach(function (t) {
+      if (S.lists.tasks.indexOf(t) < 0) S.lists.tasks.push(t);
+    });
+  });
+  save();
+  buildGroupsTable();
+  render();
+}
+$("gt").addEventListener("change", function (e) {
+  if (e.target.dataset.gc !== undefined) commitGcols(readGcols());
+});
+$("gt").addEventListener("paste", function (e) {
+  var t = e.target;
+  if (t.dataset.gc === undefined) return;
+  var txt = (e.clipboardData || window.clipboardData).getData("text");
+  if (txt.indexOf("\n") < 0 && txt.indexOf("\t") < 0) return;
+  e.preventDefault();
+  var rows = txt.replace(/\r/g, "").replace(/\n+$/, "").split("\n").map(function (r) { return r.split("\t"); });
+  var c0 = +t.dataset.gc, r0 = +t.dataset.r, cols = readGcols();
+  rows.forEach(function (row, i) {
+    row.forEach(function (v, j) {
+      if (c0 + j < GCOLS.length) cols[c0 + j][r0 + i] = v.trim();
+    });
+  });
+  commitGcols(cols);
+  say("Pasted " + rows.length + " row" + (rows.length === 1 ? "" : "s") + ".");
+});
+$("mygroup").addEventListener("change", function () {
+  S.group = this.value;
+  save();
+  fillSelects();
+});
+function syncGroupSelect() {
+  var g = $("mygroup");
+  if (g) g.value = S.group || "";
+}
 // ========================================================================
 // TAB SWITCHING AND THE COLLAPSIBLE OPTIONS PANEL
 // ========================================================================
@@ -3924,15 +4131,16 @@ function tab(n) {
     $("wsline").innerHTML = wsLine();
   }, 0);
   if (n === "backup" && $("subname") && !$("subname").value) $("subname").value = S.tsName || "";
-  ["tracker", "sheet", "weekly", "tms", "dash", "team", "lists", "backup"].forEach(function (k) {
+  ["tracker", "sheet", "weekly", "tms", "dash", "team", "lists", "backup", "admin"].forEach(function (k) {
     $("v-" + k).hidden = k !== n;
     $("t-" + k).classList.toggle("on", k === n);
   });
   say("");
 }
-["tracker", "sheet", "weekly", "tms", "dash", "team", "lists", "backup"].forEach(function (k) {
+["tracker", "sheet", "weekly", "tms", "dash", "team", "lists", "backup", "admin"].forEach(function (k) {
   $("t-" + k).onclick = function () {
     tab(k);
+    if (k === "admin" && window.renderAdmin) renderAdmin();
   };
 });
 $("golists").onclick = function () {
@@ -4684,7 +4892,9 @@ function nrm(t) {
     .replace(/\s+/g, "");
 }
 function scopeCode(task) {
-  var k = nrm(task);
+  var k = nrm(task),
+    pc = (S.lists && S.lists.pcodes) || null;
+  if (pc) for (var n in pc) if (nrm(n) === k) return pc[n];
   for (var i = 0; i < SCOPE.length; i++) if (nrm(SCOPE[i][0]) === k) return SCOPE[i][1];
   return null;
 }
@@ -6261,13 +6471,15 @@ function tmsGroups(p) {
     none = false;
   S.items.forEach(function (it) {
     if ((it.project || "") !== p) return;
-    Object.keys(it.log || {}).forEach(function (d) {
-      if (!(num(it.log[d]) > 0)) return;
-      var t = tgOf(it, d);
-      if (t) {
-        tg[t] = 1;
-        any = true;
-      } else none = true;
+    ["log", "est"].forEach(function (kk) {
+      Object.keys(it[kk] || {}).forEach(function (d) {
+        if (!(num(it[kk][d]) > 0)) return;
+        var t = tgOf(it, d);
+        if (t) {
+          tg[t] = 1;
+          any = true;
+        } else none = true;
+      });
     });
   });
   if (!any) return [undefined];
@@ -6331,7 +6543,11 @@ function tmsCalc(p, tk) {
     act = rows.map(function () {
       return 0;
     }),
+    est = rows.map(function () {
+      return 0;
+    }),
     other = 0,
+    otherEst = 0,
     names = {},
     first = null,
     last = null,
@@ -6339,22 +6555,30 @@ function tmsCalc(p, tk) {
     to = c.to || "";
   S.items.forEach(function (it) {
     if ((it.project || "") !== p) return;
-    var h = 0;
-    Object.keys(it.log).forEach(function (d) {
-      var v = num(it.log[d]);
-      if (!v) return;
-      if (tk !== undefined && tgOf(it, d) !== tk) return;
-      if (from && d < from) return;
-      if (to && d > to) return;
-      h += v;
-      if (first === null || d < first) first = d;
-      if (last === null || d > last) last = d;
+    var h = 0,
+      e = 0;
+    // Plan MH is the estimated time from the Tracker; Actual MH is the logged time
+    ["log", "est"].forEach(function (kk) {
+      Object.keys(it[kk] || {}).forEach(function (d) {
+        var v = num(it[kk][d]);
+        if (!v) return;
+        if (tk !== undefined && tgOf(it, d) !== tk) return;
+        if (from && d < from) return;
+        if (to && d > to) return;
+        if (kk === "log") h += v;
+        else e += v;
+        if (first === null || d < first) first = d;
+        if (last === null || d > last) last = d;
+      });
     });
-    if (!h) return;
+    if (!h && !e) return;
     var i = tmsMatch(rows, it.task);
-    if (i >= 0) act[i] += h;
-    else {
+    if (i >= 0) {
+      act[i] += h;
+      est[i] += e;
+    } else {
       other += h;
+      otherEst += e;
       names[it.task || "(no task)"] = 1;
     }
   });
@@ -6373,17 +6597,20 @@ function tmsCalc(p, tk) {
     rows: rows,
     tk: tk,
     act: act,
+    est: est,
     other: other,
+    otherEst: otherEst,
     otherNames: Object.keys(names),
     df: df,
     dt: dt,
     nom: nom,
   };
 }
+// Plan MH = estimated time entered in the Tracker (including work not listed in the scope rows)
 function tmsPlan(k) {
-  var t = 0;
-  k.rows.forEach(function (r) {
-    t += num(r.plan);
+  var t = k.otherEst;
+  k.est.forEach(function (v) {
+    t += v;
   });
   return t;
 }
@@ -6552,7 +6779,7 @@ function renderTms() {
       act = 0;
     kk.rows.forEach(function (r, i) {
       var a = kk.act[i],
-        pl = num(r.plan),
+        pl = kk.est[i],
         f = tmsFlag(pl, a, warn);
       plan += pl;
       act += a;
@@ -6566,13 +6793,9 @@ function renderTms() {
         '" value="' +
         esc(r.n) +
         '" aria-label="Work scope"></td>' +
-        '<td class="in"><input type="number" step="0.5" min="0" data-tf="plan" data-ti="' +
-        i +
-        '" data-tk="' +
-        ea +
-        '" value="' +
-        (pl || "") +
-        '" placeholder="0" aria-label="Plan MH"></td>' +
+        '<td title="Estimated time from the Tracker tab">' +
+        (pl ? f0(pl) : '<span class="hint">0</span>') +
+        "</td>" +
         "<td>" +
         f0(a) +
         '</td><td class="' +
@@ -6608,12 +6831,15 @@ function renderTms() {
         ea +
         '" title="Remove this work scope" aria-label="Remove row">✕</button></td></tr>';
     });
-    if (kk.other > 0) {
+    if (kk.other > 0 || kk.otherEst > 0) {
       act += kk.other;
+      plan += kk.otherEst;
       T +=
         '<tr class="np"><td>–</td><td class="l">Other work not listed above <span class="hint">(' +
         esc(kk.otherNames.join(", ")) +
-        ")</span></td><td>–</td><td>" +
+        ")</span></td><td>" +
+        (kk.otherEst ? f0(kk.otherEst) : "–") +
+        "</td><td>" +
         f0(kk.other) +
         "</td><td></td><td></td><td>" +
         (basis === "actual" ? occ(0, kk.other) : "–") +
@@ -6792,7 +7018,7 @@ $("tmsx").onclick = function () {
     );
     k.rows.forEach(function (r, i) {
       var a = k.act[i],
-        pl = num(r.plan),
+        pl = k.est[i],
         f = tmsFlag(pl, a, warn);
       plan += pl;
       act += a;
@@ -6809,12 +7035,13 @@ $("tmsx").onclick = function () {
         f[1],
       ]);
     });
-    if (k.other > 0) {
+    if (k.other > 0 || k.otherEst > 0) {
       act += k.other;
+      plan += k.otherEst;
       out.push([
         "",
         "Other work not listed above (" + k.otherNames.join(", ") + ")",
-        null,
+        k.otherEst || null,
         r2(k.other),
         null,
         null,
@@ -8220,6 +8447,615 @@ ensureLists();
 buildPeriod();
 syncBar();
 render();
+
+// ========================================================================
+// PERSONAL LINKS + CLOUD SAVE (Firebase Hosting + Firestore, no Firebase login for users)
+//
+// Users sign in INSIDE this app with a name and a personal code. The app turns those
+// into a long private key (SHA-256) and uses it as the id of their data in Firestore.
+// The page address then becomes their individual link:   https://site.web.app/#k=<key>
+// Opening that link on any PC loads their data; no code needed. Anyone who holds the
+// link can open that data, so each person should keep their link private.
+// Needs: Firestore only (see FIREBASE.md). On Firebase Hosting the project settings are
+// picked up automatically from /__/firebase/init.json.
+// ========================================================================
+var FB_VER = "10.12.2",
+  FB_CFG_KEY = "mh-fbcfg",
+  FB_AUTO_KEY = "mh-fbauto",
+  FB_ID_KEY = "mh-key",
+  fb = { db: null, ready: null, key: "", name: "", busy: false, last: "", timer: 0, skip: false, cfg: undefined };
+
+function fbCfgSync() {
+  if (typeof FIREBASE_CONFIG !== "undefined" && FIREBASE_CONFIG) return FIREBASE_CONFIG;
+  try {
+    var j = localStorage.getItem(FB_CFG_KEY);
+    return j ? JSON.parse(j) : null;
+  } catch (e) {
+    return null;
+  }
+}
+// settings: built into the page, pasted by the user, or (on Firebase Hosting) served by the host
+function fbCfg() {
+  if (fb.cfg !== undefined) return Promise.resolve(fb.cfg);
+  var c = fbCfgSync();
+  if (c) return Promise.resolve((fb.cfg = c));
+  if (!/^https?:$/.test(location.protocol) || !window.fetch) return Promise.resolve((fb.cfg = null));
+  return fetch("/__/firebase/init.json")
+    .then(function (r) {
+      return r.ok ? r.json() : null;
+    })
+    .then(function (j) {
+      return (fb.cfg = j && j.projectId ? j : null);
+    })
+    .catch(function () {
+      return (fb.cfg = null);
+    });
+}
+function fbAuto() {
+  try {
+    return localStorage.getItem(FB_AUTO_KEY) !== "0";
+  } catch (e) {
+    return true;
+  }
+}
+function fbScript(src) {
+  return new Promise(function (ok, no) {
+    var s = document.createElement("script");
+    s.src = src;
+    s.onload = ok;
+    s.onerror = function () {
+      no(new Error("blocked"));
+    };
+    document.head.appendChild(s);
+  });
+}
+function fbInit() {
+  if (fb.ready) return fb.ready;
+  fb.ready = fbCfg()
+    .then(function (cfg) {
+      if (!cfg) throw new Error("no-config");
+      var base = "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-";
+      return fbScript(base + "app-compat.js")
+        .then(function () {
+          return fbScript(base + "firestore-compat.js");
+        })
+        .then(function () {
+          firebase.initializeApp(cfg);
+          fb.db = firebase.firestore();
+        });
+    })
+    .catch(function (e) {
+      fb.ready = null;
+      throw e;
+    });
+  return fb.ready;
+}
+function fbErr(e) {
+  var c = (e && (e.code || e.message)) || "";
+  if (/no-config/.test(c)) return "Online saving is not set up on this page yet.";
+  if (/blocked|network|unavailable/.test(c))
+    return "Could not reach the online storage. If this PC's network blocks it, ask IT to allow www.gstatic.com, *.googleapis.com and *.firebaseio.com.";
+  if (/permission-denied/.test(c)) return "The online storage refused this. Check the Firestore rules in FIREBASE.md.";
+  return "Online save error: " + (e && e.message ? e.message : c);
+}
+function sha256hex(txt) {
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)).then(function (b) {
+    return Array.prototype.map
+      .call(new Uint8Array(b), function (x) {
+        return ("0" + x.toString(16)).slice(-2);
+      })
+      .join("");
+  });
+}
+function fbDoc() {
+  return fb.db.collection("saves").doc(fb.key);
+}
+function fbWhen(t) {
+  try {
+    return t ? t.toDate().toLocaleString() : "";
+  } catch (e) {
+    return "";
+  }
+}
+function myLink() {
+  return location.protocol === "file:" ? "" : location.origin + location.pathname + "#k=" + fb.key;
+}
+function setKey(key, name) {
+  fb.key = key;
+  fb.name = name || "";
+  try {
+    if (key) {
+      localStorage.setItem(FB_ID_KEY, JSON.stringify({ k: key, n: fb.name }));
+    } else localStorage.removeItem(FB_ID_KEY);
+  } catch (e) {}
+  if (/^https?:$/.test(location.protocol) && history.replaceState)
+    history.replaceState(null, "", location.pathname + location.search + (key ? "#k=" + key : ""));
+  cloudUi();
+}
+function cloudSave(quiet) {
+  if (!fb.key || !fb.db || fb.busy) return Promise.resolve();
+  var txt = JSON.stringify(S);
+  if (txt.length > 900000) {
+    say("Too much data for one online save (limit about 900 KB). Download a backup file instead.");
+    return Promise.resolve();
+  }
+  fb.busy = true;
+  return fbDoc()
+    .set({ data: txt, name: fb.name || S.tsName || "", updated: firebase.firestore.FieldValue.serverTimestamp() })
+    .then(function () {
+      fb.last = new Date().toLocaleTimeString();
+      if (!quiet) say("Saved online.");
+    })
+    .catch(function (e) {
+      say(fbErr(e));
+    })
+    .then(function () {
+      fb.busy = false;
+      cloudUi();
+    });
+}
+function useCloud(o, msg) {
+  fb.skip = true;
+  try {
+    applyState(JSON.parse(o.data));
+    if (!S.tsName && o.name) S.tsName = o.name;
+    say(msg);
+  } finally {
+    fb.skip = false;
+  }
+}
+function cloudLoad(ask) {
+  if (!fb.key) return Promise.resolve();
+  return fbInit()
+    .then(function () {
+      return fbDoc().get();
+    })
+    .then(function (d) {
+      if (!d.exists) return say("Nothing is saved online yet. Use Save now.");
+      var o = d.data();
+      if (ask && !confirm("Replace the data in this browser with your online copy" + (o.updated ? " saved " + fbWhen(o.updated) : "") + "?")) return;
+      useCloud(o, "Loaded your data from online.");
+    })
+    .catch(function (e) {
+      say(fbErr(e));
+    });
+}
+// after signing in or opening a personal link
+function fbFirstSync(msgIn) {
+  return fbInit()
+    .then(function () {
+      return fbDoc().get();
+    })
+    .then(function (d) {
+      var empty = !(S.items && S.items.length);
+      if (!d.exists) return cloudSave(true).then(function () { say(msgIn + " Your data will now save online."); });
+      var o = d.data();
+      if (empty || confirm("Your saved data" + (o.updated ? " (" + fbWhen(o.updated) + ")" : "") + " was found online.\n\nOK = load it here (replaces the data in this browser)\nCancel = keep this browser's data (press Save now to overwrite the online copy)"))
+        useCloud(o, msgIn + " Loaded your saved data.");
+      else say(msgIn + " Kept this browser's data.");
+    })
+    .catch(function (e) {
+      say(fbErr(e));
+    });
+}
+// every normal save() also queues an online save a few seconds later
+var _saveLocal = save;
+save = function () {
+  _saveLocal();
+  if (fb.key && fb.db && !fb.skip && fbAuto()) {
+    clearTimeout(fb.timer);
+    fb.timer = setTimeout(function () {
+      cloudSave(true);
+    }, 3000);
+  }
+};
+function signIn(name, code) {
+  name = (name || "").trim();
+  if (!name || (code || "").length < 6) return say("Enter your name and a personal code of at least 6 characters.");
+  if (!window.crypto || !crypto.subtle) return say("This browser cannot sign in here. Open the site over https.");
+  return sha256hex("mh1:" + name.toLowerCase() + ":" + code).then(function (key) {
+    setKey(key, name);
+    closeSignin();
+    return fbFirstSync("Signed in as " + name + ".");
+  });
+}
+function signOut() {
+  var wipe = confirm("Sign out.\n\nAlso remove your data from this browser? (It stays safe online.)\nOK = remove it, Cancel = keep a copy here");
+  clearTimeout(fb.timer);
+  setKey("", "");
+  if (wipe) {
+    try {
+      localStorage.removeItem(KEY);
+    } catch (e) {}
+    location.href = location.pathname;
+  } else {
+    cloudUi();
+    say("Signed out.");
+  }
+}
+function openSignin() {
+  if ($("signin")) return;
+  var d = document.createElement("div");
+  d.id = "signin";
+  d.innerHTML =
+    '<div class="sbox" role="dialog" aria-modal="true" aria-labelledby="sti"><h2 id="sti">Sign in</h2>' +
+    '<p class="hint">Enter your name and a personal code. First time? Pick any code you will remember (6+ characters); your account is created automatically. Your page address then becomes your own link.</p>' +
+    '<label>Name<input id="sname" type="text" autocomplete="username"></label>' +
+    '<label>Personal code<input id="scode" type="password" autocomplete="current-password"></label>' +
+    '<div class="row"><button id="sgo" class="primary">Sign in</button><button id="sskip">Not now</button><span class="sp"></span><button id="sadmin" class="lnk">Admin</button></div></div>';
+  document.body.appendChild(d);
+  $("sname").value = S.tsName || "";
+  ($("sname").value ? $("scode") : $("sname")).focus();
+}
+function closeSignin() {
+  var d = $("signin");
+  if (d) d.remove();
+}
+function cloudUi() {
+  var el = $("cloudbox"),
+    who = $("whoami");
+  if (who) {
+    who.innerHTML =
+      '<button id="fbsavebtn" class="primary" title="' + (fb.key ? "Save your data online" : "Save your data") + '">Save</button>' +
+      (fb.key
+        ? '<span class="wname">' + esc(fb.name || "Signed in") + '</span><button id="fbcopy" title="Copy my personal link">My link</button><button id="fbout">Sign out</button>'
+        : fb.cfg ? '<button id="fbopen">Sign in</button>' : "") +
+      (fb.last ? '<span class="wsaved">Saved ' + esc(fb.last) + "</span>" : "");
+  }
+  if (!el) return;
+}
+document.addEventListener("click", function (e) {
+  var id = e.target.id;
+  if (!id) return;
+  if (id === "fbopen") openSignin();
+  else if (id === "sskip") closeSignin();
+  else if (id === "sgo") signIn($("sname").value, $("scode").value);
+  else if (id === "fbsavebtn") {
+    if (fb.key) fbInit().then(function () { return cloudSave(false); });
+    else if (fb.cfg) openSignin();
+    else $("bkfile").click(); // not set up for online saving: download a backup file instead
+  }
+  else if (id === "fbout") signOut();
+  else if (id === "fbcopy") {
+    var l = myLink();
+    if (!l) return say("Your personal link works once the page is on the web (not from a file).");
+    var done = function () {
+      say("Your personal link was copied. Keep it private.");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(l).then(done, function () {
+      say("Your link: " + l);
+    });
+    else say("Your link: " + l);
+  }
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && $("signin") && /^s(name|code)$/.test(e.target.id)) $("sgo").click();
+  if (e.key === "Escape") closeSignin();
+});
+document.addEventListener("change", function (e) {
+  if (e.target.id === "fbauto") {
+    try {
+      localStorage.setItem(FB_AUTO_KEY, e.target.checked ? "1" : "0");
+    } catch (x) {}
+  }
+});
+// startup: a personal link in the address, or a previous sign-in, restores the person
+(function () {
+  var h = /[#&]k=([0-9a-f]{64})/.exec(location.hash),
+    saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(FB_ID_KEY) || "null");
+  } catch (e) {}
+  cloudUi();
+  fbCfg().then(function (cfg) {
+    if (h) {
+      var nm = saved && saved.k === h[1] ? saved.n : "";
+      setKey(h[1], nm);
+      fbFirstSync(nm ? "Welcome back, " + nm + "." : "Opened your personal link.");
+    } else if (saved && saved.k) {
+      setKey(saved.k, saved.n);
+      fbFirstSync("Welcome back" + (saved.n ? ", " + saved.n : "") + ".");
+    } else {
+      cloudUi();
+      if (cfg && !(S.items && S.items.length && sessionStorage.getItem("mh-skip"))) openSignin();
+    }
+  });
+  document.addEventListener("click", function (e) {
+    if (e.target.id === "sskip") {
+      try {
+        sessionStorage.setItem("mh-skip", "1");
+      } catch (x) {}
+    }
+  });
+})();
+
+// ------------------------------------------------------------------------
+// MASTER LISTS: the admin publishes the dropdown lists (config/lists). Everybody else can only
+// pick from them; the Lists tab becomes read-only for them.
+// ------------------------------------------------------------------------
+var MKEYS = ["projects", "tasks", "descs", "holidays", "targets"];
+function lockLists() {
+  LISTS_LOCKED = !!fb.master && !(window.adm && adm.user);
+  var note = $("listhint");
+  if (note)
+    note.textContent = LISTS_LOCKED
+      ? "These lists are managed by your admin. Pick from them in the dropdowns; they cannot be edited here."
+      : "These fill the dropdowns. Paste a column or a block copied from Excel into any cell, or type items one per cell. Clear a cell to remove an item. Changes save when you leave a cell." +
+        (window.adm && adm.user ? " As admin, press Publish to give these lists to everyone." : "");
+  var b = $("listpub");
+  if (b) b.hidden = !(window.adm && adm.user);
+}
+function applyMaster() {
+  if (fb.master) {
+    MKEYS.forEach(function (k) {
+      if (Array.isArray(fb.master[k])) S.lists[k] = fb.master[k].slice();
+    });
+    if (fb.master.groups) S.lists.groups = JSON.parse(JSON.stringify(fb.master.groups));
+    if (fb.master.pcodes) S.lists.pcodes = JSON.parse(JSON.stringify(fb.master.pcodes));
+    ensureLists();
+  }
+  lockLists();
+  if (fb.master && LISTS_LOCKED) _saveLocal();
+  fillSelects();
+  buildListsTable();
+  buildGroupsTable();
+  render();
+}
+function loadMaster() {
+  return fbInit()
+    .then(function () {
+      return fb.db.collection("config").doc("lists").get();
+    })
+    .then(function (d) {
+      fb.master = d.exists ? d.data() : null;
+      applyMaster();
+    })
+    .catch(function () {});
+}
+var _applyState = applyState;
+applyState = function (o) {
+  _applyState(o);
+  if (fb.master) applyMaster();
+};
+document.addEventListener("click", function (e) {
+  if (e.target.id !== "listpub") return;
+  if (!confirm("Give these lists to everyone? People will only be able to pick from them, and their own lists are replaced.")) return;
+  var o = { updated: firebase.firestore.FieldValue.serverTimestamp() };
+  MKEYS.forEach(function (k) {
+    o[k] = (S.lists[k] || []).slice();
+  });
+  o.groups = JSON.parse(JSON.stringify(S.lists.groups));
+  o.pcodes = JSON.parse(JSON.stringify(S.lists.pcodes || {}));
+  fb.db
+    .collection("config")
+    .doc("lists")
+    .set(o)
+    .then(function () {
+      fb.master = o;
+      say("Published. Everyone now picks from these lists.");
+    })
+    .catch(function (er) {
+      say(typeof admErr === "function" ? admErr(er) : fbErr(er));
+    });
+});
+fbCfg().then(function (cfg) {
+  if (cfg) loadMaster();
+});
+
+// ========================================================================
+// ADMIN VIEW: one place to see everybody's saved data.
+// The admin signs in with ONE Firebase email + password (created by you in the Firebase
+// console, see FIREBASE.md). Only that email may list, read and delete all records.
+// Normal users never see this.
+// ========================================================================
+var adm = { auth: null, user: null, rows: [], from: "", to: "", busy: false };
+
+function admInit() {
+  return fbInit().then(function () {
+    if (adm.auth) return;
+    var s = "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-auth-compat.js";
+    return (window.firebase && firebase.auth ? Promise.resolve() : fbScript(s)).then(function () {
+      adm.auth = firebase.auth();
+      adm.auth.onAuthStateChanged(function (u) {
+        adm.user = u;
+        $("t-admin").hidden = !u;
+        if (window.lockLists) {
+          if (!u && fb.master) loadMaster();
+          else {
+            lockLists();
+            fillSelects();
+            buildListsTable();
+            buildGroupsTable();
+          }
+        }
+        if (u && adm.wantTab) {
+          adm.wantTab = false;
+          tab("admin");
+          renderAdmin();
+        }
+        if (!u && !$("v-admin").hidden) tab("tracker");
+      });
+    });
+  });
+}
+function openAdminSignin() {
+  closeSignin();
+  var d = document.createElement("div");
+  d.id = "signin";
+  d.innerHTML =
+    '<div class="sbox" role="dialog" aria-modal="true"><h2>Admin sign-in</h2>' +
+    '<p class="hint">For the person who manages the site. Use the email and password you created in the Firebase console.</p>' +
+    '<label>Admin email<input id="aemail" type="email" autocomplete="username"></label>' +
+    '<label>Password<input id="apass" type="password" autocomplete="current-password"></label>' +
+    '<div class="row"><button id="ago" class="primary">Sign in</button><button id="sskip">Cancel</button></div></div>';
+  document.body.appendChild(d);
+  $("aemail").focus();
+}
+function admErr(e) {
+  var c = (e && (e.code || e.message)) || "";
+  if (/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)) return "Wrong admin email or password.";
+  if (/too-many/.test(c)) return "Too many tries. Wait a few minutes.";
+  if (/permission-denied/.test(c)) return "This account is not the admin in the Firestore rules (see FIREBASE.md).";
+  return fbErr(e);
+}
+function admStats(o) {
+  var r = { name: o.name || "(no name)", updated: o.updated, hrs: 0, days: {}, tasks: 0, all: 0 };
+  try {
+    var d = JSON.parse(o.data);
+    (d.items || []).forEach(function (it) {
+      var any = false;
+      Object.keys(it.log || {}).forEach(function (k) {
+        var v = num(it.log[k]);
+        if (!(v > 0)) return;
+        r.all += v;
+        if (k >= adm.from && k <= adm.to) {
+          r.hrs += v;
+          r.days[k] = 1;
+          any = true;
+        }
+      });
+      if (any) r.tasks++;
+    });
+  } catch (e) {}
+  r.nd = Object.keys(r.days).length;
+  return r;
+}
+function renderAdmin() {
+  var el = $("adminbox");
+  if (!el) return;
+  if (!adm.user) {
+    el.innerHTML = "<h2>Admin</h2><p class='hint'>Sign in as admin to see everyone's data.</p>";
+    return;
+  }
+  if (!adm.from) {
+    var p = periodOf(iso(new Date()));
+    adm.from = p[0];
+    adm.to = p[1];
+  }
+  el.innerHTML = "<h2>Admin: everyone's data</h2><p class='hint'>Loading…</p>";
+  fbInit()
+    .then(function () {
+      return fb.db.collection("saves").get();
+    })
+    .then(function (qs) {
+      adm.rows = [];
+      qs.forEach(function (d) {
+        var o = d.data();
+        adm.rows.push({ id: d.id, o: o });
+      });
+      drawAdmin();
+    })
+    .catch(function (e) {
+      el.innerHTML = "<h2>Admin</h2><p class='hint'>" + esc(admErr(e)) + "</p>";
+    });
+}
+function drawAdmin() {
+  var el = $("adminbox"),
+    tot = 0,
+    base = location.protocol === "file:" ? "" : location.origin + location.pathname,
+    list = adm.rows
+      .map(function (r) {
+        var s = admStats(r.o);
+        s.id = r.id;
+        return s;
+      })
+      .sort(function (a, b) {
+        return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1;
+      });
+  var h =
+    "<h2>Admin: everyone's data</h2>" +
+    '<div class="otrow"><label>From<input type="date" id="admfrom" value="' + adm.from + '"></label>' +
+    '<label>To<input type="date" id="admto" value="' + adm.to + '"></label>' +
+    '<button id="admrefresh">Refresh</button><button id="admcsv">Download summary (CSV)</button><button id="admout">Admin sign out</button></div>' +
+    '<p class="hint">' + list.length + " people. Hours are the logged hours between the dates above. Open a person's link to view or fix their data; it saves back to them.</p>" +
+    '<div class="wrap" style="margin:0"><table class="mini" style="width:100%"><thead><tr><th>Name</th><th>Last saved</th><th>Logged hrs</th><th>Days logged</th><th>Tasks</th><th>All-time hrs</th><th></th></tr></thead><tbody>';
+  list.forEach(function (s) {
+    tot += s.hrs;
+    var link = base ? base + "#k=" + s.id : "";
+    h +=
+      "<tr><td>" + esc(s.name) + "</td><td>" + esc(fbWhen(s.updated)) + "</td><td>" + (Math.round(s.hrs * 100) / 100) + "</td><td>" + s.nd + "</td><td>" + s.tasks + "</td><td>" + (Math.round(s.all * 100) / 100) + "</td><td>" +
+      (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener"><button type="button">Open</button></a> ' : "") +
+      '<button data-adl="' + s.id + '">Copy link</button> <button data-adj="' + s.id + '">Download</button> <button data-add="' + s.id + '" class="del" title="Delete this person\'s saved data">✕</button></td></tr>';
+  });
+  if (!list.length) h += '<tr><td colspan="7" class="empty">Nobody has saved online yet.</td></tr>';
+  h += "</tbody><tfoot><tr><td>Total</td><td></td><td>" + (Math.round(tot * 100) / 100) + "</td><td></td><td></td><td></td><td></td></tr></tfoot></table></div>";
+  el.innerHTML = h;
+  adm.list = list;
+}
+function admRow(id) {
+  return adm.rows.filter(function (r) {
+    return r.id === id;
+  })[0];
+}
+document.addEventListener("click", function (e) {
+  var t = e.target,
+    id = t.id;
+  if (id === "sadmin") {
+    openAdminSignin();
+  } else if (id === "ago") {
+    adm.wantTab = true;
+    admInit()
+      .then(function () {
+        return adm.auth.signInWithEmailAndPassword($("aemail").value.trim(), $("apass").value);
+      })
+      .then(closeSignin)
+      .catch(function (er) {
+        adm.wantTab = false;
+        say(admErr(er));
+      });
+  } else if (id === "admout") {
+    adm.auth.signOut();
+  } else if (id === "admrefresh") {
+    renderAdmin();
+  } else if (id === "admcsv") {
+    var q = function (v) {
+      return '"' + String(v).replace(/"/g, '""') + '"';
+    };
+    var out = ["Name,Last saved,Logged hrs (" + adm.from + " to " + adm.to + "),Days logged,Tasks,All-time hrs"];
+    (adm.list || []).forEach(function (s) {
+      out.push([q(s.name), q(fbWhen(s.updated)), s.hrs, s.nd, s.tasks, s.all].join(","));
+    });
+    saveFile("everyone-" + iso(new Date()) + ".csv", "﻿" + out.join("\r\n"));
+  } else if (t.dataset && t.dataset.adl) {
+    var base = location.origin + location.pathname + "#k=" + t.dataset.adl;
+    if (navigator.clipboard) navigator.clipboard.writeText(base).then(function () { say("Link copied."); }, function () { say(base); });
+    else say(base);
+  } else if (t.dataset && t.dataset.adj) {
+    var r = admRow(t.dataset.adj);
+    if (r) saveFile("manhour-" + (r.o.name || "user").replace(/[^\w\-]+/g, "_") + "-" + iso(new Date()) + ".json", r.o.data);
+  } else if (t.dataset && t.dataset.add) {
+    var r2 = admRow(t.dataset.add);
+    if (r2 && confirm("Delete all saved data for " + (r2.o.name || "this person") + "? This cannot be undone.")) {
+      fb.db.collection("saves").doc(r2.id).delete().then(renderAdmin, function (er) {
+        say(admErr(er));
+      });
+    }
+  }
+});
+document.addEventListener("change", function (e) {
+  if (e.target.id === "admfrom") adm.from = e.target.value;
+  else if (e.target.id === "admto") adm.to = e.target.value;
+  else return;
+  drawAdmin();
+});
+// bring a previous admin sign-in back after a reload (only if online saving is set up)
+fbCfg().then(function (cfg) {
+  if (cfg) {
+    try {
+      if (localStorage.getItem("mh-admin") === "1") admInit();
+    } catch (e) {}
+  }
+});
+document.addEventListener("click", function (e) {
+  if (e.target.id === "ago")
+    try {
+      localStorage.setItem("mh-admin", "1");
+    } catch (x) {}
+  if (e.target.id === "admout")
+    try {
+      localStorage.removeItem("mh-admin");
+    } catch (x) {}
+});
 </script>
   </body>
 </html>

@@ -2080,6 +2080,9 @@ button.lnk { border: 0; background: none; text-decoration: underline; color: var
 
 table.mini tr.gh td { background: var(--task); font-weight: 600; }
 table.mini select { min-height: 30px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+
+table.rep tr.tgrow td { background: var(--task); font-weight: 700; }
+table.rep button.lnk { text-align: left; }
 </style>
   </head>
   <body>
@@ -2351,6 +2354,9 @@ table.mini select { min-height: 30px; border: 1px solid var(--line); border-radi
             style="width: 100px"
         /></label>
         
+        <label title="One overall figure used for Occupancy on every project. Leave empty to work it out from each project's dates."
+          >Nominal man-hours (overall)<input type="number" id="tmsnom" min="0" step="any" style="width: 120px"
+        /></label>
         <span class="sp"></span>
         <button id="tmsx">Export TMS</button><button id="tmsprint">Print</button>
       </div>
@@ -6732,7 +6738,7 @@ function tmsCalc(p, tk) {
     });
   }
   var auto = nom;
-  if (num(c.nom) > 0) nom = num(c.nom);
+  if (num(S.tmsNom) > 0) nom = num(S.tmsNom); // one overall nominal figure set by the user
   return {
     c: c,
     auto: auto,
@@ -6799,6 +6805,8 @@ function renderTms() {
           .join("")
       : '<option value="">(no projects)</option>';
   setv("tmswarn", warn);
+  $("tmsnom").value = num(S.tmsNom) > 0 ? S.tmsNom : "";
+  $("tmsnom").placeholder = "auto";
   $("tmsdl").innerHTML = ((S.lists && S.lists.tasks) || [])
     .map(function (t) {
       return "<option>" + esc(t) + "</option>";
@@ -6878,7 +6886,8 @@ function renderTms() {
     '<tr><td class="tl">Project No.</td><td class="in">' +
     inp("no", c.no === undefined ? d.no : c.no) +
     '</td><td class="tl">Role in the project</td><td class="in">' +
-    inp("role", c.role || "") +
+    inp("role", c.role || "").replace("<input ", '<input list="tmsrolel" placeholder="e.g. Engineering - PIC" ') +
+    '<datalist id="tmsrolel"><option>Engineering - PIC</option><option>Engineering - Contributor</option><option>Others</option></datalist>' +
     '</td></tr><tr><td class="tl">Project Name:</td><td class="in">' +
     inp("name", c.name === undefined ? d.name : c.name) +
     '</td><td class="tl">Duration:</td><td class="in"><input type="date" data-tf="from" data-ti="" value="' +
@@ -6887,14 +6896,6 @@ function renderTms() {
     (k.dt || "") +
     '"> <span class="hint">' +
     (c.from || c.to ? "set by you" : "auto, from logged dates") +
-    '</span></td></tr><tr><td class="tl">Nominal man-hours:</td><td class="in" colspan="3"><input type="number" min="0" step="any" style="width:110px" data-tf="nom" data-ti="" value="' +
-    (num(c.nom) > 0 ? c.nom : "") +
-    '" placeholder="' +
-    f0(k.auto) +
-    '"> <span class="hint">' +
-    (num(c.nom) > 0
-      ? "set by you; clear the box to go back to the automatic " + f0(k.auto) + " hrs"
-      : "automatic from the duration (weekdays less holidays). Type a number to set your own.") +
     "</span></td></tr>";
   var stOpts = function (v) {
     var l = TMS_ST.slice();
@@ -7036,24 +7037,24 @@ function tmsFy() {
   var n = new Date();
   return n.getMonth() >= 3 ? n.getFullYear() : n.getFullYear() - 1;
 }
-// logged hours of one project by target > category (work scope) > fiscal month
-function tmsMonthly(p, fy) {
+function tmsRoleOf(p) {
+  return String((tmsCfg(p).role || "")).trim() || "Others";
+}
+// logged hours of every project by target > category (the project's "Role in the project") > fiscal month
+function tmsMonthly(fy) {
   var from = fy + "-04-01",
     to = fy + 1 + "-03-31",
     res = {};
   S.items.forEach(function (it) {
-    if ((it.project || "") !== p) return;
+    var cat = tmsRoleOf(it.project || "");
     Object.keys(it.log || {}).forEach(function (d) {
       var v = num(it.log[d]);
       if (!v || d < from || d > to) return;
       var tk = tgOf(it, d) || "",
-        rows = tmsRowsOf(p, tk),
-        i = tmsMatch(rows, it.task),
-        cat = i >= 0 ? rows[i].n : "Other work not listed",
         m = (+d.slice(5, 7) + 8) % 12; // Apr = 0 ... Mar = 11
       res[tk] = res[tk] || {};
-      res[tk][cat] = res[tk][cat] || { m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i: i >= 0 ? i : 999 };
-      res[tk][cat].m[m] += v;
+      res[tk][cat] = res[tk][cat] || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      res[tk][cat][m] += v;
     });
   });
   return res;
@@ -7068,43 +7069,55 @@ function tmsTgOrder(keys) {
     return x - y || (a < b ? -1 : 1);
   });
 }
+// the overall nominal man-hours: the figure typed in the bar, else every working day of the fiscal year
+function tmsNomAll(fy) {
+  if (num(S.tmsNom) > 0) return num(S.tmsNom);
+  var t = 0;
+  rangeDays(fy + "-04-01", fy + 1 + "-03-31").forEach(function (d) {
+    t += nomOf(d);
+  });
+  return t;
+}
+var tmsOpen = {};
 function tmsSumTables(cur, list) {
   var fy = tmsFy(),
+    nomAll = tmsNomAll(fy),
     h1 =
-      "<caption><b>Hours per month</b> for " +
-      esc(cur || "–") +
-      ' · fiscal year <input type="number" id="tmsfy" min="2000" max="2100" step="1" value="' +
+      '<caption><b>Hours per month</b> · fiscal year <input type="number" id="tmsfy" min="2000" max="2100" step="1" value="' +
       fy +
       '" style="width:80px"> (Apr ' +
       fy +
       " – Mar " +
       (fy + 1) +
-      ')</caption><thead><tr><th>Targets</th><th>Category</th>' +
+      ') <span class="hint">· Category = the project\'s "Role in the project" (no role = Others) · Volume % = hours ÷ nominal man-hours (' +
+      f0(nomAll) +
+      ")</span></caption><thead><tr><th>Targets</th><th>Category</th>" +
       TMS_MON.map(function (m) {
         return "<th>" + m + "</th>";
       }).join("") +
       "<th>Total<br>Man-hour</th><th>Volume<br>%</th></tr></thead><tbody>",
-    mon = cur ? tmsMonthly(cur, fy) : {},
-    tks = tmsTgOrder(Object.keys(mon));
+    mon = tmsMonthly(fy),
+    tks = tmsTgOrder(Object.keys(mon)),
+    gm = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    gt = 0,
+    vol = function (v) {
+      return nomAll > 0 ? pc((v / nomAll) * 100, 2) : "–";
+    };
   if (!tks.length) h1 += '<tr><td colspan="16" class="hint" style="padding:14px">No logged hours in this fiscal year.</td></tr>';
   tks.forEach(function (tk) {
     var cats = Object.keys(mon[tk]).sort(function (a, b) {
-        return mon[tk][a].i - mon[tk][b].i;
-      }),
-      tot = 0,
-      mt = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    cats.forEach(function (c) {
-      mon[tk][c].m.forEach(function (v, i) {
-        tot += v;
-        mt[i] += v;
-      });
+      if (a === "Others") return 1;
+      if (b === "Others") return -1;
+      return a < b ? -1 : 1;
     });
     cats.forEach(function (c, ri) {
-      var m = mon[tk][c].m,
+      var m = mon[tk][c],
         t = 0;
-      m.forEach(function (v) {
+      m.forEach(function (v, i) {
         t += v;
+        gm[i] += v;
       });
+      gt += t;
       h1 +=
         "<tr><td class='l'>" +
         (ri === 0 ? esc(tk || "(no target)") : "") +
@@ -7113,111 +7126,141 @@ function tmsSumTables(cur, list) {
         "</td>" +
         m
           .map(function (v) {
-            return "<td>" + (v ? f0(v) : "") + "</td>";
+            return "<td>" + f0(v) + "</td>";
           })
           .join("") +
         "<td>" +
         f0(t) +
         "</td><td>" +
-        (tot ? pc((t / tot) * 100, 1) : "–") +
+        vol(t) +
         "</td></tr>";
     });
+  });
+  if (tks.length)
     h1 +=
-      "<tr class='np'><td></td><td class='l'><b>Total</b></td>" +
-      mt
+      "<tr class='np'><td class='l'><b>Totals:</b></td><td></td>" +
+      gm
         .map(function (v) {
-          return "<td><b>" + (v ? f0(v) : "") + "</b></td>";
+          return "<td><b>" + f0(v) + "</b></td>";
         })
         .join("") +
       "<td><b>" +
-      f0(tot) +
-      "</b></td><td><b>100.0%</b></td></tr>";
-  });
+      f0(gt) +
+      "</b></td><td><b>" +
+      vol(gt) +
+      "</b></td></tr>";
   h1 += "</tbody>";
-  // table 2: every project, by target and work scope
-  var h2 =
-      "<caption><b>Project and work scope</b> · all projects" +
-      ' <span class="hint">· Estimated = estimate in the Tracker; Planned = typed in here (blank counts as Estimated); Efficiency = Planned ÷ Actual</span></caption><thead><tr><th>Targets</th><th>Project</th><th>Workscope</th><th>Estimated</th><th>Planned</th><th>Actual</th><th>Efficiency</th></tr></thead><tbody>',
-    n = 0,
-    gE = 0,
-    gP = 0,
-    gA = 0;
+  // table 2: target > project > work scope
+  var tree = {};
   list.forEach(function (p) {
     tmsGroups(p).forEach(function (g) {
       var k = tmsCalc(p, g),
-        tk = g || "",
-        rows = tmsEditRowsPeek(p, tk),
-        ea = esc(tk);
+        tk = g || "";
+      tree[tk] = tree[tk] || {};
+      var rows = [];
       k.rows.forEach(function (r, i) {
         var e = k.est[i],
           a = k.act[i],
           pl = r.planned === undefined || r.planned === "" ? null : num(r.planned);
         if (!e && !a && pl === null) return;
-        n++;
-        var pv = pl === null ? e : pl;
-        gE += e;
-        gP += pv;
-        gA += a;
-        h2 +=
-          "<tr><td class='l'>" +
-          (g === undefined ? "" : esc(g || "(no target)")) +
-          "</td><td class='l'>" +
-          esc(p) +
-          "</td><td class='l'>" +
-          esc(r.n) +
-          "</td><td>" +
-          f0(e) +
-          '</td><td class="in"><input type="number" step="any" min="0" data-sp="' +
-          esc(p) +
-          '" data-tk="' +
-          ea +
-          '" data-ti="' +
-          i +
-          '" value="' +
-          (pl === null ? "" : pl) +
-          '" placeholder="' +
-          f0(e) +
-          '" aria-label="Planned hours"></td><td>' +
-          f0(a) +
-          "</td><td>" +
-          (a ? pc((pv / a) * 100, 0) : "–") +
-          "</td></tr>";
+        rows.push({ n: r.n, e: e, a: a, pl: pl, i: i });
       });
-      if (k.other > 0 || k.otherEst > 0) {
-        n++;
-        gE += k.otherEst;
-        gP += k.otherEst;
-        gA += k.other;
-        h2 +=
-          "<tr class='np'><td class='l'>" +
-          (g === undefined ? "" : esc(g || "(no target)")) +
-          "</td><td class='l'>" +
-          esc(p) +
-          "</td><td class='l'>Other work not listed</td><td>" +
-          f0(k.otherEst) +
-          "</td><td>" +
-          f0(k.otherEst) +
-          "</td><td>" +
-          f0(k.other) +
-          "</td><td>" +
-          (k.other ? pc((k.otherEst / k.other) * 100, 0) : "–") +
-          "</td></tr>";
-      }
+      if (k.other > 0 || k.otherEst > 0) rows.push({ n: "Other work not listed", e: k.otherEst, a: k.other, pl: null, i: -1 });
+      if (rows.length) tree[tk][p] = rows;
     });
   });
-  if (!n) h2 += '<tr><td colspan="7" class="hint" style="padding:14px">Nothing logged or estimated yet.</td></tr>';
-  h2 += "</tbody>";
-  if (n)
+  var h2 =
+      '<caption><b>Project and work scope</b> · click a Target or Project to open it <span class="hint">· Estimated = estimate in the Tracker; Planned = typed in at the work scope (blank counts as Estimated); Efficiency = Estimated ÷ Actual</span></caption><thead><tr><th>Targets</th><th>Project</th><th>Workscope</th><th>Estimated</th><th>Planned</th><th>Actual</th><th>Efficiency</th></tr></thead><tbody>',
+    n = 0,
+    G = { e: 0, p: 0, a: 0 },
+    eff = function (e, a) {
+      return a ? pc((e / a) * 100, 2) : "–";
+    },
+    tot = function (rows) {
+      var t = { e: 0, p: 0, a: 0 };
+      rows.forEach(function (r) {
+        t.e += r.e;
+        t.p += r.pl === null ? r.e : r.pl;
+        t.a += r.a;
+      });
+      return t;
+    },
+    cells = function (t) {
+      return "<td>" + f0(t.e) + "</td><td>" + f0(t.p) + "</td><td>" + f0(t.a) + "</td><td>" + eff(t.e, t.a) + "</td>";
+    };
+  tmsTgOrder(Object.keys(tree)).forEach(function (tk) {
+    var ps = Object.keys(tree[tk]);
+    if (!ps.length) return;
+    n++;
+    var tt = { e: 0, p: 0, a: 0 },
+      kT = "t|" + tk,
+      oT = tmsOpen[kT] !== false,
+      body = "";
+    ps.forEach(function (p) {
+      var rows = tree[tk][p],
+        t = tot(rows),
+        kP = "p|" + tk + "|" + p,
+        oP = !!tmsOpen[kP];
+      tt.e += t.e;
+      tt.p += t.p;
+      tt.a += t.a;
+      body +=
+        '<tr class="np"><td></td><td class="l"><button class="lnk" data-tog="' +
+        esc(kP) +
+        '">' +
+        (oP ? "▾" : "▸") +
+        " " +
+        esc(p) +
+        "</button></td><td></td>" +
+        cells(t) +
+        "</tr>";
+      if (oP)
+        rows.forEach(function (r) {
+          var pv = r.pl === null ? r.e : r.pl;
+          body +=
+            "<tr><td></td><td></td><td class='l'>" +
+            esc(r.n) +
+            "</td><td>" +
+            f0(r.e) +
+            "</td><td class=\"in\">" +
+            (r.i >= 0
+              ? '<input type="number" step="any" min="0" data-sp="' +
+                esc(p) +
+                '" data-tk="' +
+                esc(tk) +
+                '" data-ti="' +
+                r.i +
+                '" value="' +
+                (r.pl === null ? "" : r.pl) +
+                '" placeholder="' +
+                f0(r.e) +
+                '" aria-label="Planned hours">'
+              : f0(pv)) +
+            "</td><td>" +
+            f0(r.a) +
+            "</td><td>" +
+            eff(r.e, r.a) +
+            "</td></tr>";
+        });
+    });
+    G.e += tt.e;
+    G.p += tt.p;
+    G.a += tt.a;
     h2 +=
-      "<tfoot><tr><td></td><td></td><td style='text-align:right'>Total</td><td>" +
-      f0(gE) +
-      "</td><td>" +
-      f0(gP) +
-      "</td><td>" +
-      f0(gA) +
-      "</td><td>" +
-      (gA ? pc((gP / gA) * 100, 0) : "–") +
-      "</td></tr></tfoot>";
+      '<tr class="tgrow"><td class="l"><button class="lnk" data-tog="' +
+      esc(kT) +
+      '">' +
+      (oT ? "▾" : "▸") +
+      " " +
+      esc(tk || "(no target)") +
+      "</button></td><td></td><td></td>" +
+      cells(tt) +
+      "</tr>" +
+      (oT ? body : "");
+  });
+  if (!n) h2 += '<tr><td colspan="7" class="hint" style="padding:14px">Nothing logged or estimated yet.</td></tr>';
+  else h2 += "<tfoot><tr><td class='l'>Totals:</td><td></td><td></td>" + cells(G) + "</tr></tfoot>";
+  h2 += "</tbody>";
   return [h1, h2];
 }
 function tmsEditRowsPeek(p, tk) {
@@ -7232,6 +7275,14 @@ function renderTmsSum(cur, list) {
   $("tmsmonth").innerHTML = t[0];
   $("tmsflat").innerHTML = t[1];
 }
+$("tmssum").addEventListener("click", function (e) {
+  var b = e.target.closest("[data-tog]");
+  if (!b) return;
+  var k = b.dataset.tog;
+  tmsOpen[k] = k.charAt(0) === "t" ? tmsOpen[k] === false : !tmsOpen[k];
+  tmsForce = true;
+  renderTms();
+});
 $("tmssum").addEventListener("change", function (e) {
   var t = e.target;
   if (t.id === "tmsfy") {
@@ -7256,6 +7307,12 @@ $("tmsproj").onchange = function () {
   save();
   renderTms();
 };
+$("tmsnom").onchange = function () {
+  if (num(this.value) > 0) S.tmsNom = num(this.value);
+  else delete S.tmsNom;
+  save();
+  renderTms();
+};
 $("tmswarn").onchange = function () {
   S.tmsWarn = Math.min(100, Math.max(0, num(this.value)));
   save();
@@ -7276,9 +7333,6 @@ $("v-tms").addEventListener("change", function (e) {
     else if (f === "plan") r.plan = num(t.value);
     else if (f === "eff") r.eff = t.value === "" ? "" : num(t.value);
     else if (f === "st") r.st = t.value;
-  } else if (f === "nom") {
-    if (num(t.value) > 0) c.nom = num(t.value);
-    else delete c.nom;
   } else c[f] = t.value;
   save();
   setTimeout(renderTms, 0);

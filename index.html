@@ -2072,13 +2072,21 @@ button.lnk { border: 0; background: none; text-decoration: underline; color: var
 #whoami { margin-left: 0; }
 #gt td.l { text-align: left; }
 #gt input { width: 100%; min-width: 150px; }
+
+.sgsec { padding: 10px 0; border-top: 1px solid var(--line); }
+.sgsec:first-of-type { border-top: 0; }
+#pt input { width: 100%; min-width: 150px; }
+#pt td.l { text-align: left; }
+
+table.mini tr.gh td { background: var(--task); font-weight: 600; }
+table.mini select { min-height: 30px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
 </style>
   </head>
   <body>
     <!-- ===== PAGE HEADER AND TAB BAR ===== -->
     <header>
       <h1>Man-Hour Tracker</h1>
-      <p>Type hours straight into the grid, or import your Excel sheet. Data stays in this browser unless you sign in.</p><select id="mygroup" aria-label="My group" title="Your group: decides which activities the Task dropdown shows"><option value="">My group…</option><option>Piping</option><option>Electrical</option><option>Mechanical</option></select><span id="whoami"></span>
+      <p>Type hours straight into the grid, or import your Excel sheet. Data stays in this browser unless you sign in.</p><select id="mygroup" aria-label="My group" title="Your group: decides which activities the Task dropdown shows"></select><span id="whoami"></span>
     </header>
 
     <nav class="tabs">
@@ -2342,26 +2350,17 @@ button.lnk { border: 0; background: none; text-decoration: underline; color: var
             step="5"
             style="width: 100px"
         /></label>
-        <label
-          >Occupancy based on<select
-            id="tmsocc"
-            style="
-              padding: 6px 8px;
-              border: 1px solid var(--line);
-              border-radius: 6px;
-              background: var(--panel);
-            "
-          >
-            <option value="plan">Plan MH</option>
-            <option value="actual">Actual MH</option>
-          </select></label
-        >
+        
         <span class="sp"></span>
         <button id="tmsx">Export TMS</button><button id="tmsprint">Print</button>
       </div>
       <div class="wrap"><table id="tmsover" class="rep"></table></div>
       <div class="wrap" style="padding: 10px"><table id="tmshead" class="tmsh"></table></div>
       <div id="tmstab"></div>
+      <div id="tmssum">
+        <div class="wrap"><table id="tmsmonth" class="rep"></table></div>
+        <div class="wrap"><table id="tmsflat" class="rep"></table></div>
+      </div>
       <div class="add">
         <input
           id="tmsnew"
@@ -2566,9 +2565,12 @@ button.lnk { border: 0; background: none; text-decoration: underline; color: var
           one per cell. Clear a cell to remove an item. Changes save when you leave a cell.</span
         >
       </div>
+      <div class="lists"><div class="card" id="sgbox" style="grid-column: 1 / -1"></div></div>
       <div class="wrap"><table id="lt" class="rep"></table></div>
       <div class="bar"><span class="hint"><b>Activities by group.</b> The Task dropdown shows the activities of your own group (chosen at the top), plus TM Concerns and Official Business. Piping activities have a code (1-7) used in the weekly report.</span></div>
       <div class="wrap"><table id="gt" class="rep"></table></div>
+      <div class="bar"><span class="hint"><b>Projects and descriptions by group.</b> When a group has its own projects or descriptions, its members see those in the dropdowns; otherwise they see the general lists above.</span></div>
+      <div class="wrap"><table id="pt" class="rep"></table></div>
     </section>
 
     <!-- Scripts run top to bottom and share one global scope. Keep this order. -->
@@ -2579,7 +2581,14 @@ button.lnk { border: 0; background: none; text-decoration: underline; color: var
 // Example:
 //   var FIREBASE_CONFIG = { apiKey: "...", authDomain: "x.firebaseapp.com", projectId: "x", appId: "..." };
 // ========================================================================
-var FIREBASE_CONFIG = null;
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBYydadik0yvV32OLW8lYKo9jMHy_B2aoA",
+  authDomain: "manhr-tracker.firebaseapp.com",
+  projectId: "manhr-tracker",
+  storageBucket: "manhr-tracker.firebasestorage.app",
+  messagingSenderId: "554867803071",
+  appId: "1:554867803071:web:2b7b8b526cd9106f53970a",
+};
 
 // Man-hour tracker, part 1 of 12. See README.md for how the files fit together.
 // Data model (saved in the browser under KEY below):
@@ -3782,8 +3791,21 @@ $("exp").onclick = function () {
 // LISTS TAB: dropdown choices (projects, tasks, descriptions, day types, targets)
 // ========================================================================
 // Activities by group (the "scope of work" lists). Piping activities also carry a code (1-7).
-var GKEYS = ["Piping", "Electrical", "Mechanical", "TM Concerns", "Official Business"];
-var DISC = ["Piping", "Electrical", "Mechanical"]; // the groups a person belongs to
+var COMMON = ["TM Concerns", "Official Business"]; // shared by every group
+var DEF_SECTIONS = [{ name: "Section 1", groups: ["Piping", "Electrical", "Mechanical"] }];
+// all group names, in section order (the admin adds and removes groups)
+function allGroups() {
+  var o = [];
+  ((S.lists && S.lists.sections) || DEF_SECTIONS).forEach(function (sec) {
+    sec.groups.forEach(function (g) {
+      if (o.indexOf(g) < 0) o.push(g);
+    });
+  });
+  return o;
+}
+function gkeys() {
+  return allGroups().concat(COMMON);
+}
 var DEF_GROUPS = {
   Piping: ["Equipment Modeling", "Pipe Modeling", "Pipe Support Modeling", "Structure Modeling", "Floor Modeling", "Equipment Layout", "Foundation Layout", "Piping Layout", "Pipe Support Layout", "Spool Drawings", "Spool Detail", "Support Detail Drawings", "P&ID/ Flowsheet", "2D-CAD Work", "Other 3D Work", "Others"],
   Electrical: ["Single Line Diagram", "Wiring System Diagram", "Instrumentation Flow Sheet", "Control System Diagram", "Panel Board Layout", "Panel Board Outline Drawings", "Panel Board Specification Sheet", "Cable Rack Route Plan", "Cable List & Size Calculations", "Input/Output List", "Instrumentation Hookup Drawings", "Instrumentation Specification Sheet", "Instrumentation and Contact Plot Plan", "Electrical Construction Specification Sheet", "Lightning Rod Diagram", "Lighting and Power Layout", "Equipment Grounding Pole Layout Diagram", "Vendor Documentation", "Screen Design", "PLC Programming", "System Configuration Diagram", "BOQ", "Panel Board Specification", "Operation Block Diagram", "PMD"],
@@ -3837,12 +3859,15 @@ function ensureLists() {
   S.lists.targets = S.lists.targets || ["Target 1", "Target 2", "Target 3"];
   if (!S.lists.groups) S.lists.groups = defGroups();
   if (!S.lists.pcodes) S.lists.pcodes = defCodes();
-  GKEYS.forEach(function (g) {
+  if (!S.lists.sections) S.lists.sections = JSON.parse(JSON.stringify(DEF_SECTIONS));
+  S.lists.gproj = S.lists.gproj || {};
+  S.lists.gdesc = S.lists.gdesc || {};
+  gkeys().forEach(function (g) {
     S.lists.groups[g] = S.lists.groups[g] || [];
   });
   S.group = S.group || "";
   if (!LISTS_LOCKED)
-    GKEYS.forEach(function (g) {
+    gkeys().forEach(function (g) {
       S.lists.groups[g].forEach(function (t) {
         if (S.lists.tasks.indexOf(t) < 0) S.lists.tasks.push(t);
       });
@@ -3870,11 +3895,16 @@ function fillSelects() {
     var el = $(x[0]),
       cur = el.value;
     if (x[0] === "nt") return fillTaskSelect(el, cur);
+    var src = S.lists[x[1]];
+    if (x[1] === "projects" || x[1] === "descs") {
+      var gl = (x[1] === "projects" ? S.lists.gproj : S.lists.gdesc) || {};
+      if (S.group && gl[S.group] && gl[S.group].length) src = gl[S.group];
+    }
     el.innerHTML =
       '<option value="">' +
       x[2] +
       "…</option>" +
-      S.lists[x[1]]
+      src
         .map(function (v) {
           return "<option>" + esc(v) + "</option>";
         })
@@ -3888,7 +3918,14 @@ function fillTaskSelect(el, cur) {
     },
     seen = {},
     h = '<option value="">Task…</option>',
-    show = S.group && DISC.indexOf(S.group) >= 0 ? [S.group, "TM Concerns", "Official Business"] : GKEYS;
+    cloud = !!(typeof fb !== "undefined" && fb.cfg),
+    isAdm = !!(typeof adm !== "undefined" && adm.user),
+    show =
+      S.group && allGroups().indexOf(S.group) >= 0
+        ? [S.group].concat(COMMON)
+        : cloud && !isAdm
+          ? COMMON // online: people see their own group's activities once the admin has assigned them
+          : gkeys();
   show.forEach(function (g) {
     var l = (S.lists.groups[g] || []).filter(Boolean);
     l.forEach(function (t) {
@@ -3897,7 +3934,7 @@ function fillTaskSelect(el, cur) {
     if (l.length) h += '<optgroup label="' + esc(g) + '">' + l.map(o).join("") + "</optgroup>";
   });
   // tasks that are in no group (e.g. the weekly-report scope names, or older entries) still show up
-  GKEYS.forEach(function (g) {
+  gkeys().forEach(function (g) {
     (S.lists.groups[g] || []).forEach(function (t) {
       seen[t] = 1;
     });
@@ -3953,7 +3990,7 @@ function buildListsTable() {
   $("lt").innerHTML = h + "</tbody>";
 }
 function renderLists() {
-  if (!$("gt").contains(document.activeElement)) buildGroupsTable();
+  if (!$("gt").contains(document.activeElement) && !$("pt").contains(document.activeElement)) buildGroupsTable();
   syncGroupSelect();
   if (!$("lt").contains(document.activeElement)) buildListsTable();
 }
@@ -4012,69 +4049,88 @@ $("lt").addEventListener("paste", function (e) {
   commitCols(cols);
   say("Pasted " + rows.length + " row" + (rows.length === 1 ? "" : "s") + ".");
 });
-// ---- activities by group table ----
-var GCOLS = ["Piping", "Code", "Electrical", "Mechanical", "TM Concerns", "Official Business"];
-function gtCols() {
-  var g = S.lists.groups,
-    pc = S.lists.pcodes || {};
-  return [
-    g.Piping.slice(),
-    g.Piping.map(function (t) {
-      return pc[t] === undefined ? "" : pc[t];
-    }),
-    g.Electrical.slice(),
-    g.Mechanical.slice(),
-    g["TM Concerns"].slice(),
-    g["Official Business"].slice(),
-  ];
+// ---- sections and groups, and the per-group lists (admin edits; everyone else sees them read-only) ----
+function gridSpec(which) {
+  var L = S.lists,
+    cols = [];
+  var add = function (label, get, set) {
+    cols.push({ label: label, get: get, set: set });
+  };
+  if (which === "act") {
+    allGroups()
+      .concat(COMMON)
+      .forEach(function (g) {
+        add(g + " activities", function () { return (L.groups[g] || []).slice(); }, function (a) { L.groups[g] = a; });
+        if (g === "Piping")
+          cols.push({
+            label: "Code",
+            code: true,
+            get: function () {
+              return (L.groups.Piping || []).map(function (t) {
+                var c = (L.pcodes || {})[t];
+                return c === undefined ? "" : c;
+              });
+            },
+          });
+      });
+  } else {
+    allGroups().forEach(function (g) {
+      add(g + " projects", function () { return (L.gproj[g] || []).slice(); }, function (a) { L.gproj[g] = a; });
+      add(g + " descriptions", function () { return (L.gdesc[g] || []).slice(); }, function (a) { L.gdesc[g] = a; });
+    });
+  }
+  return cols;
 }
-function buildGroupsTable() {
-  var el = $("gt");
+function buildGrid(id, which) {
+  var el = $(id);
   if (!el) return;
-  var cols = gtCols(),
-    n = Math.max.apply(null, cols.map(function (c) { return c.length; })) + (LISTS_LOCKED ? 0 : 8),
-    h = "<thead><tr>" + GCOLS.map(function (k) { return "<th>" + (k === "Code" ? "Code" : k + " activities") + "</th>"; }).join("") + "</tr></thead><tbody>";
+  var spec = gridSpec(which),
+    cols = spec.map(function (c) { return c.get(); }),
+    n = Math.max.apply(null, cols.map(function (c) { return c.length; }).concat([0])) + (LISTS_LOCKED ? 0 : 8),
+    h = "<thead><tr>" + spec.map(function (c) { return "<th>" + esc(c.label) + "</th>"; }).join("") + "</tr></thead><tbody>";
+  if (!spec.length) h += '<tr><td class="empty">No groups yet.</td></tr>';
   for (var r = 0; r < n; r++) {
     h += "<tr>";
     cols.forEach(function (c, i) {
       var v = c[r] === undefined ? "" : c[r];
-      if (LISTS_LOCKED) h += '<td class="' + (i === 1 ? "" : "l") + '">' + esc(v) + "</td>";
-      else h += '<td><input type="text" data-gc="' + i + '" data-r="' + r + '" value="' + esc(v) + '" aria-label="' + GCOLS[i] + " row " + (r + 1) + '"' + (i === 1 ? ' style="width:56px;text-align:center"' : "") + "></td>";
+      if (LISTS_LOCKED) h += '<td class="' + (spec[i].code ? "" : "l") + '">' + esc(v) + "</td>";
+      else h += '<td><input type="text" data-gc="' + i + '" data-r="' + r + '" value="' + esc(v) + '" aria-label="' + esc(spec[i].label) + " row " + (r + 1) + '"' + (spec[i].code ? ' style="width:56px;text-align:center"' : "") + "></td>";
     });
     h += "</tr>";
   }
   el.innerHTML = h + "</tbody>";
 }
-function readGcols() {
-  var cols = GCOLS.map(function () { return []; });
-  document.querySelectorAll("#gt input").forEach(function (i) {
+function readGrid(id, which) {
+  var cols = gridSpec(which).map(function () { return []; });
+  document.querySelectorAll("#" + id + " input").forEach(function (i) {
     cols[+i.dataset.gc][+i.dataset.r] = i.value;
   });
   return cols;
 }
-function commitGcols(cols) {
-  var clean = function (a) {
-    var seen = {}, out = [];
-    (a || []).forEach(function (v) {
-      v = String(v || "").trim();
-      if (v && !seen[v]) { seen[v] = 1; out.push(v); }
-    });
-    return out;
-  };
-  var pc = {};
-  (cols[0] || []).forEach(function (t, i) {
-    t = String(t || "").trim();
-    var c = String((cols[1] || [])[i] || "").trim();
-    if (t && c !== "") pc[t] = isNaN(+c) ? c : +c;
+function commitGrid(id, which, cols) {
+  var spec = gridSpec(which),
+    clean = function (a) {
+      var seen = {}, out = [];
+      (a || []).forEach(function (v) {
+        v = String(v || "").trim();
+        if (v && !seen[v]) { seen[v] = 1; out.push(v); }
+      });
+      return out;
+    };
+  spec.forEach(function (c, i) {
+    if (c.code) {
+      var pc = {},
+        names = cols[i - 1] || [];
+      names.forEach(function (t, k) {
+        t = String(t || "").trim();
+        var v = String((cols[i] || [])[k] || "").trim();
+        if (t && v !== "") pc[t] = isNaN(+v) ? v : +v;
+      });
+      S.lists.pcodes = pc;
+    } else c.set(clean(cols[i]));
   });
-  S.lists.groups.Piping = clean(cols[0]);
-  S.lists.groups.Electrical = clean(cols[2]);
-  S.lists.groups.Mechanical = clean(cols[3]);
-  S.lists.groups["TM Concerns"] = clean(cols[4]);
-  S.lists.groups["Official Business"] = clean(cols[5]);
-  S.lists.pcodes = pc;
-  GKEYS.forEach(function (g) {
-    S.lists.groups[g].forEach(function (t) {
+  gkeys().forEach(function (g) {
+    (S.lists.groups[g] || []).forEach(function (t) {
       if (S.lists.tasks.indexOf(t) < 0) S.lists.tasks.push(t);
     });
   });
@@ -4082,24 +4138,97 @@ function commitGcols(cols) {
   buildGroupsTable();
   render();
 }
-$("gt").addEventListener("change", function (e) {
-  if (e.target.dataset.gc !== undefined) commitGcols(readGcols());
-});
-$("gt").addEventListener("paste", function (e) {
-  var t = e.target;
-  if (t.dataset.gc === undefined) return;
-  var txt = (e.clipboardData || window.clipboardData).getData("text");
-  if (txt.indexOf("\n") < 0 && txt.indexOf("\t") < 0) return;
-  e.preventDefault();
-  var rows = txt.replace(/\r/g, "").replace(/\n+$/, "").split("\n").map(function (r) { return r.split("\t"); });
-  var c0 = +t.dataset.gc, r0 = +t.dataset.r, cols = readGcols();
-  rows.forEach(function (row, i) {
-    row.forEach(function (v, j) {
-      if (c0 + j < GCOLS.length) cols[c0 + j][r0 + i] = v.trim();
-    });
+[["gt", "act"], ["pt", "pg"]].forEach(function (x) {
+  var el = $(x[0]);
+  if (!el) return;
+  el.addEventListener("change", function (e) {
+    if (e.target.dataset.gc !== undefined) commitGrid(x[0], x[1], readGrid(x[0], x[1]));
   });
-  commitGcols(cols);
-  say("Pasted " + rows.length + " row" + (rows.length === 1 ? "" : "s") + ".");
+  el.addEventListener("paste", function (e) {
+    var t = e.target;
+    if (t.dataset.gc === undefined) return;
+    var txt = (e.clipboardData || window.clipboardData).getData("text");
+    if (txt.indexOf("\n") < 0 && txt.indexOf("\t") < 0) return;
+    e.preventDefault();
+    var rows = txt.replace(/\r/g, "").replace(/\n+$/, "").split("\n").map(function (r) { return r.split("\t"); });
+    var c0 = +t.dataset.gc, r0 = +t.dataset.r, cols = readGrid(x[0], x[1]);
+    rows.forEach(function (row, i) {
+      row.forEach(function (v, j) {
+        if (cols[c0 + j]) cols[c0 + j][r0 + i] = v.trim();
+      });
+    });
+    commitGrid(x[0], x[1], cols);
+    say("Pasted " + rows.length + " row" + (rows.length === 1 ? "" : "s") + ".");
+  });
+});
+function buildGroupsTable() {
+  drawSG();
+  buildGrid("gt", "act");
+  buildGrid("pt", "pg");
+}
+// the section and group editor (admin only)
+function drawSG() {
+  var el = $("sgbox");
+  if (!el) return;
+  el.hidden = LISTS_LOCKED;
+  if (LISTS_LOCKED) return;
+  var h = '<h2>Sections and groups</h2><p class="hint">Only the admin can add or remove sections and groups. Each group gets its own activities, projects and descriptions below. The admin puts each person into a group in the Admin tab.</p>';
+  S.lists.sections.forEach(function (sec, si) {
+    h += '<div class="sgsec"><b>' + esc(sec.name) + '</b> <button data-sdel="' + si + '" title="Remove this section and its groups">Remove section</button><div class="chips" style="margin:8px 0">';
+    sec.groups.forEach(function (g, gi) {
+      h += '<span class="chip">' + esc(g) + '<button data-gdel="' + si + ":" + gi + '" title="Remove this group" aria-label="Remove group ' + esc(g) + '">✕</button></span>';
+    });
+    h += '</div><button data-gadd="' + si + '">Add group</button></div>';
+  });
+  h += '<div style="margin-top:10px"><button data-sadd="1" class="primary">Add section</button></div>';
+  el.innerHTML = h;
+}
+document.addEventListener("click", function (e) {
+  var d = e.target.dataset;
+  if (!d || !$("sgbox") || !$("sgbox").contains(e.target)) return;
+  var L = S.lists,
+    done = function () {
+      save();
+      fillSelects();
+      buildGroupsTable();
+      render();
+    },
+    taken = function (n) {
+      return allGroups().concat(COMMON).some(function (g) { return g.toLowerCase() === n.toLowerCase(); });
+    };
+  if (d.sadd) {
+    var n = (prompt("Name of the new section:") || "").trim();
+    if (!n) return;
+    L.sections.push({ name: n, groups: [] });
+    done();
+  } else if (d.gadd !== undefined) {
+    var g = (prompt("Name of the new group:") || "").trim();
+    if (!g) return;
+    if (taken(g)) return say("There is already a group with that name.");
+    L.sections[+d.gadd].groups.push(g);
+    L.groups[g] = [];
+    done();
+  } else if (d.gdel !== undefined) {
+    var p = d.gdel.split(":"),
+      sec = L.sections[+p[0]],
+      name = sec.groups[+p[1]];
+    if (!confirm('Remove the group "' + name + '" and its lists? People assigned to it will have no group until you assign them again.')) return;
+    sec.groups.splice(+p[1], 1);
+    delete L.groups[name];
+    delete L.gproj[name];
+    delete L.gdesc[name];
+    done();
+  } else if (d.sdel !== undefined) {
+    var sc = L.sections[+d.sdel];
+    if (!confirm('Remove the section "' + sc.name + '" and all of its groups and their lists?')) return;
+    sc.groups.forEach(function (name) {
+      delete L.groups[name];
+      delete L.gproj[name];
+      delete L.gdesc[name];
+    });
+    L.sections.splice(+d.sdel, 1);
+    done();
+  }
 });
 $("mygroup").addEventListener("change", function () {
   S.group = this.value;
@@ -4108,7 +4237,17 @@ $("mygroup").addEventListener("change", function () {
 });
 function syncGroupSelect() {
   var g = $("mygroup");
-  if (g) g.value = S.group || "";
+  if (!g) return;
+  var cloud = !!(typeof fb !== "undefined" && fb.cfg);
+  g.hidden = cloud; // online, the admin assigns the group; the person cannot choose it
+  g.innerHTML =
+    '<option value="">My group…</option>' +
+    allGroups()
+      .map(function (n) {
+        return "<option>" + esc(n) + "</option>";
+      })
+      .join("");
+  g.value = S.group || "";
 }
 // ========================================================================
 // TAB SWITCHING AND THE COLLAPSIBLE OPTIONS PANEL
@@ -6592,8 +6731,11 @@ function tmsCalc(p, tk) {
       nom += nomOf(d);
     });
   }
+  var auto = nom;
+  if (num(c.nom) > 0) nom = num(c.nom);
   return {
     c: c,
+    auto: auto,
     rows: rows,
     tk: tk,
     act: act,
@@ -6644,7 +6786,7 @@ function renderTms() {
       (ae.dataset.tk || "").replace(/"/g, '\\"') +
       '"]';
   var warn = tmsWarn(),
-    basis = S.tmsOcc || "plan",
+    basis = "actual",
     list = tmsProjects(),
     cur = tmsCur(),
     sel = $("tmsproj");
@@ -6657,7 +6799,6 @@ function renderTms() {
           .join("")
       : '<option value="">(no projects)</option>';
   setv("tmswarn", warn);
-  setv("tmsocc", basis);
   $("tmsdl").innerHTML = ((S.lists && S.lists.tasks) || [])
     .map(function (t) {
       return "<option>" + esc(t) + "</option>";
@@ -6721,6 +6862,7 @@ function renderTms() {
         "</td></tr></tfoot>"
       : "");
   $("tmsover").innerHTML = h;
+  renderTmsSum(cur, list);
   if (!cur) {
     $("tmshead").innerHTML = "";
     $("tmstab").innerHTML = "";
@@ -6745,6 +6887,14 @@ function renderTms() {
     (k.dt || "") +
     '"> <span class="hint">' +
     (c.from || c.to ? "set by you" : "auto, from logged dates") +
+    '</span></td></tr><tr><td class="tl">Nominal man-hours:</td><td class="in" colspan="3"><input type="number" min="0" step="any" style="width:110px" data-tf="nom" data-ti="" value="' +
+    (num(c.nom) > 0 ? c.nom : "") +
+    '" placeholder="' +
+    f0(k.auto) +
+    '"> <span class="hint">' +
+    (num(c.nom) > 0
+      ? "set by you; clear the box to go back to the automatic " + f0(k.auto) + " hrs"
+      : "automatic from the duration (weekdays less holidays). Type a number to set your own.") +
     "</span></td></tr>";
   var stOpts = function (v) {
     var l = TMS_ST.slice();
@@ -6771,9 +6921,7 @@ function renderTms() {
         label +
         "Nominal hours in the duration: <b>" +
         f0(kk.nom) +
-        ' hrs</b> <span class="hint">· Occupancy = ' +
-        (basis === "actual" ? "Actual" : "Plan") +
-        " MH ÷ nominal hours</span></caption>" +
+        ' hrs</b> <span class="hint">· Occupancy = Actual MH ÷ nominal hours</span></caption>' +
         "<thead><tr><th>#</th><th>Work Scope</th><th>Plan MH</th><th>Actual MH</th><th>Remaining MH</th><th>Used</th><th>Occupancy<br>(Nominal)</th><th>Efficiency<br>&amp; Quality (%)</th><th>Status</th><th>Tracking</th><th></th></tr></thead><tbody>",
       plan = 0,
       act = 0;
@@ -6878,6 +7026,231 @@ function renderTms() {
     }
   }
 }
+
+// ------------------------------------------------------------------------
+// Two summary tables: hours per month by category, and project / work scope totals
+// ------------------------------------------------------------------------
+var TMS_MON = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+function tmsFy() {
+  if (S.tmsFy) return S.tmsFy;
+  var n = new Date();
+  return n.getMonth() >= 3 ? n.getFullYear() : n.getFullYear() - 1;
+}
+// logged hours of one project by target > category (work scope) > fiscal month
+function tmsMonthly(p, fy) {
+  var from = fy + "-04-01",
+    to = fy + 1 + "-03-31",
+    res = {};
+  S.items.forEach(function (it) {
+    if ((it.project || "") !== p) return;
+    Object.keys(it.log || {}).forEach(function (d) {
+      var v = num(it.log[d]);
+      if (!v || d < from || d > to) return;
+      var tk = tgOf(it, d) || "",
+        rows = tmsRowsOf(p, tk),
+        i = tmsMatch(rows, it.task),
+        cat = i >= 0 ? rows[i].n : "Other work not listed",
+        m = (+d.slice(5, 7) + 8) % 12; // Apr = 0 ... Mar = 11
+      res[tk] = res[tk] || {};
+      res[tk][cat] = res[tk][cat] || { m: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], i: i >= 0 ? i : 999 };
+      res[tk][cat].m[m] += v;
+    });
+  });
+  return res;
+}
+function tmsTgOrder(keys) {
+  var known = (S.lists && S.lists.targets) || [];
+  return keys.slice().sort(function (a, b) {
+    var x = known.indexOf(a),
+      y = known.indexOf(b);
+    if (x < 0) x = 999;
+    if (y < 0) y = 999;
+    return x - y || (a < b ? -1 : 1);
+  });
+}
+function tmsSumTables(cur, list) {
+  var fy = tmsFy(),
+    h1 =
+      "<caption><b>Hours per month</b> for " +
+      esc(cur || "–") +
+      ' · fiscal year <input type="number" id="tmsfy" min="2000" max="2100" step="1" value="' +
+      fy +
+      '" style="width:80px"> (Apr ' +
+      fy +
+      " – Mar " +
+      (fy + 1) +
+      ')</caption><thead><tr><th>Targets</th><th>Category</th>' +
+      TMS_MON.map(function (m) {
+        return "<th>" + m + "</th>";
+      }).join("") +
+      "<th>Total<br>Man-hour</th><th>Volume<br>%</th></tr></thead><tbody>",
+    mon = cur ? tmsMonthly(cur, fy) : {},
+    tks = tmsTgOrder(Object.keys(mon));
+  if (!tks.length) h1 += '<tr><td colspan="16" class="hint" style="padding:14px">No logged hours in this fiscal year.</td></tr>';
+  tks.forEach(function (tk) {
+    var cats = Object.keys(mon[tk]).sort(function (a, b) {
+        return mon[tk][a].i - mon[tk][b].i;
+      }),
+      tot = 0,
+      mt = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    cats.forEach(function (c) {
+      mon[tk][c].m.forEach(function (v, i) {
+        tot += v;
+        mt[i] += v;
+      });
+    });
+    cats.forEach(function (c, ri) {
+      var m = mon[tk][c].m,
+        t = 0;
+      m.forEach(function (v) {
+        t += v;
+      });
+      h1 +=
+        "<tr><td class='l'>" +
+        (ri === 0 ? esc(tk || "(no target)") : "") +
+        "</td><td class='l'>" +
+        esc(c) +
+        "</td>" +
+        m
+          .map(function (v) {
+            return "<td>" + (v ? f0(v) : "") + "</td>";
+          })
+          .join("") +
+        "<td>" +
+        f0(t) +
+        "</td><td>" +
+        (tot ? pc((t / tot) * 100, 1) : "–") +
+        "</td></tr>";
+    });
+    h1 +=
+      "<tr class='np'><td></td><td class='l'><b>Total</b></td>" +
+      mt
+        .map(function (v) {
+          return "<td><b>" + (v ? f0(v) : "") + "</b></td>";
+        })
+        .join("") +
+      "<td><b>" +
+      f0(tot) +
+      "</b></td><td><b>100.0%</b></td></tr>";
+  });
+  h1 += "</tbody>";
+  // table 2: every project, by target and work scope
+  var h2 =
+      "<caption><b>Project and work scope</b> · all projects" +
+      ' <span class="hint">· Estimated = estimate in the Tracker; Planned = typed in here (blank counts as Estimated); Efficiency = Planned ÷ Actual</span></caption><thead><tr><th>Targets</th><th>Project</th><th>Workscope</th><th>Estimated</th><th>Planned</th><th>Actual</th><th>Efficiency</th></tr></thead><tbody>',
+    n = 0,
+    gE = 0,
+    gP = 0,
+    gA = 0;
+  list.forEach(function (p) {
+    tmsGroups(p).forEach(function (g) {
+      var k = tmsCalc(p, g),
+        tk = g || "",
+        rows = tmsEditRowsPeek(p, tk),
+        ea = esc(tk);
+      k.rows.forEach(function (r, i) {
+        var e = k.est[i],
+          a = k.act[i],
+          pl = r.planned === undefined || r.planned === "" ? null : num(r.planned);
+        if (!e && !a && pl === null) return;
+        n++;
+        var pv = pl === null ? e : pl;
+        gE += e;
+        gP += pv;
+        gA += a;
+        h2 +=
+          "<tr><td class='l'>" +
+          (g === undefined ? "" : esc(g || "(no target)")) +
+          "</td><td class='l'>" +
+          esc(p) +
+          "</td><td class='l'>" +
+          esc(r.n) +
+          "</td><td>" +
+          f0(e) +
+          '</td><td class="in"><input type="number" step="any" min="0" data-sp="' +
+          esc(p) +
+          '" data-tk="' +
+          ea +
+          '" data-ti="' +
+          i +
+          '" value="' +
+          (pl === null ? "" : pl) +
+          '" placeholder="' +
+          f0(e) +
+          '" aria-label="Planned hours"></td><td>' +
+          f0(a) +
+          "</td><td>" +
+          (a ? pc((pv / a) * 100, 0) : "–") +
+          "</td></tr>";
+      });
+      if (k.other > 0 || k.otherEst > 0) {
+        n++;
+        gE += k.otherEst;
+        gP += k.otherEst;
+        gA += k.other;
+        h2 +=
+          "<tr class='np'><td class='l'>" +
+          (g === undefined ? "" : esc(g || "(no target)")) +
+          "</td><td class='l'>" +
+          esc(p) +
+          "</td><td class='l'>Other work not listed</td><td>" +
+          f0(k.otherEst) +
+          "</td><td>" +
+          f0(k.otherEst) +
+          "</td><td>" +
+          f0(k.other) +
+          "</td><td>" +
+          (k.other ? pc((k.otherEst / k.other) * 100, 0) : "–") +
+          "</td></tr>";
+      }
+    });
+  });
+  if (!n) h2 += '<tr><td colspan="7" class="hint" style="padding:14px">Nothing logged or estimated yet.</td></tr>';
+  h2 += "</tbody>";
+  if (n)
+    h2 +=
+      "<tfoot><tr><td></td><td></td><td style='text-align:right'>Total</td><td>" +
+      f0(gE) +
+      "</td><td>" +
+      f0(gP) +
+      "</td><td>" +
+      f0(gA) +
+      "</td><td>" +
+      (gA ? pc((gP / gA) * 100, 0) : "–") +
+      "</td></tr></tfoot>";
+  return [h1, h2];
+}
+function tmsEditRowsPeek(p, tk) {
+  return tmsRowsOf(p, tk);
+}
+var tmsForce = false;
+function renderTmsSum(cur, list) {
+  var ae = document.activeElement;
+  if (!tmsForce && ae && ae.dataset && (ae.dataset.sp !== undefined || ae.id === "tmsfy") && $("tmssum").contains(ae)) return; // don't rebuild while typing
+  var t = tmsSumTables(cur, list);
+  tmsForce = false;
+  $("tmsmonth").innerHTML = t[0];
+  $("tmsflat").innerHTML = t[1];
+}
+$("tmssum").addEventListener("change", function (e) {
+  var t = e.target;
+  if (t.id === "tmsfy") {
+    S.tmsFy = Math.min(2100, Math.max(2000, Math.round(num(t.value)) || tmsFy()));
+    save();
+    tmsForce = true;
+    renderTms();
+    return;
+  }
+  if (t.dataset && t.dataset.sp !== undefined) {
+    var r = tmsEditRows(t.dataset.sp, t.dataset.tk || "")[+t.dataset.ti];
+    if (!r) return;
+    if (t.value === "") delete r.planned;
+    else r.planned = Math.max(0, num(t.value));
+    save();
+    tmsForce = true;
+    setTimeout(renderTms, 0);
+  }
+});
 $("tmsproj").onchange = function () {
   S.tmsProj = this.value;
   save();
@@ -6885,11 +7258,6 @@ $("tmsproj").onchange = function () {
 };
 $("tmswarn").onchange = function () {
   S.tmsWarn = Math.min(100, Math.max(0, num(this.value)));
-  save();
-  renderTms();
-};
-$("tmsocc").onchange = function () {
-  S.tmsOcc = this.value;
   save();
   renderTms();
 };
@@ -6908,6 +7276,9 @@ $("v-tms").addEventListener("change", function (e) {
     else if (f === "plan") r.plan = num(t.value);
     else if (f === "eff") r.eff = t.value === "" ? "" : num(t.value);
     else if (f === "st") r.st = t.value;
+  } else if (f === "nom") {
+    if (num(t.value) > 0) c.nom = num(t.value);
+    else delete c.nom;
   } else c[f] = t.value;
   save();
   setTimeout(renderTms, 0);
@@ -6979,7 +7350,7 @@ $("tmsx").onclick = function () {
     c = kAll.c,
     d = tmsDefs(p),
     warn = tmsWarn(),
-    basis = S.tmsOcc || "plan",
+    basis = "actual",
     wb = XLSX.utils.book_new(),
     used = {};
   tmsGroups(p).forEach(function (g) {
@@ -8302,7 +8673,6 @@ var TIPS = [
   ["#wkprint", "Print the weekly report."],
   ["#tmsproj", "Project to summarise."],
   ["#tmswarn", "Show Near plan once Actual reaches this percent of Plan."],
-  ["#tmsocc", "Whether Occupancy is worked out from Plan MH or Actual MH."],
   ["#tmsx", "Download this project's TMS as an Excel file."],
   ["#tmsprint", "Print the TMS summary."],
   ["#tmsnew", "Name of a work scope to add."],
@@ -8574,6 +8944,7 @@ function setKey(key, name) {
 }
 function cloudSave(quiet) {
   if (!fb.key || !fb.db || fb.busy) return Promise.resolve();
+  S.owner = fb.key;
   var txt = JSON.stringify(S);
   if (txt.length > 900000) {
     say("Too much data for one online save (limit about 900 KB). Download a backup file instead.");
@@ -8620,20 +8991,60 @@ function cloudLoad(ask) {
       say(fbErr(e));
     });
 }
-// after signing in or opening a personal link
+// after signing in or opening a personal link.
+// The data in this browser is stamped with the account it belongs to (S.owner), so one person's
+// data never ends up in another person's account, and an account always gets ITS OWN data back.
+// the group an admin has put this person in (people cannot change it)
+function loadAssign() {
+  if (!fb.key || !fb.db) return Promise.resolve();
+  return fb.db
+    .collection("assign")
+    .doc(fb.key)
+    .get()
+    .then(function (d) {
+      S.group = d.exists && d.data().group ? d.data().group : "";
+      _saveLocal();
+      syncGroupSelect();
+      fillSelects();
+      cloudUi();
+    })
+    .catch(function () {});
+}
+function startFresh() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch (e) {}
+  location.reload();
+}
 function fbFirstSync(msgIn) {
   return fbInit()
     .then(function () {
       return fbDoc().get();
     })
     .then(function (d) {
-      var empty = !(S.items && S.items.length);
-      if (!d.exists) return cloudSave(true).then(function () { say(msgIn + " Your data will now save online."); });
+      var own = S.owner || "",
+        empty = !(S.items && S.items.length);
+      if (!d.exists) {
+        // a brand-new account
+        if (own && own !== fb.key) return startFresh(); // this browser holds somebody else's data: do not copy it
+        if (!own && !empty && !confirm("Welcome! Save the data that is in this browser into your new account?\n\nOK = yes, keep it in my account\nCancel = start with an empty account")) return startFresh();
+        S.owner = fb.key;
+        _saveLocal();
+        return cloudSave(true).then(function () {
+          say(msgIn + " Your data now saves to your account.");
+        });
+      }
       var o = d.data();
-      if (empty || confirm("Your saved data" + (o.updated ? " (" + fbWhen(o.updated) + ")" : "") + " was found online.\n\nOK = load it here (replaces the data in this browser)\nCancel = keep this browser's data (press Save now to overwrite the online copy)"))
-        useCloud(o, msgIn + " Loaded your saved data.");
-      else say(msgIn + " Kept this browser's data.");
+      // unsigned data in this browser (never belonged to an account): let the person choose
+      if (!own && !empty && !confirm("Your account already has saved data" + (o.updated ? " (" + fbWhen(o.updated) + ")" : "") + ".\n\nOK = open my account's data (the data in this browser is replaced)\nCancel = keep this browser's data for now")) {
+        say(msgIn + " Kept this browser's data. Press Save to put it in your account.");
+        return;
+      }
+      useCloud(o, msgIn + " Your account's data is loaded.");
+      S.owner = fb.key;
+      _saveLocal();
     })
+    .then(loadAssign)
     .catch(function (e) {
       say(fbErr(e));
     });
@@ -8641,6 +9052,7 @@ function fbFirstSync(msgIn) {
 // every normal save() also queues an online save a few seconds later
 var _saveLocal = save;
 save = function () {
+  if (fb.key) S.owner = fb.key;
   _saveLocal();
   if (fb.key && fb.db && !fb.skip && fbAuto()) {
     clearTimeout(fb.timer);
@@ -8700,6 +9112,7 @@ function cloudUi() {
       (fb.key
         ? '<span class="wname">' + esc(fb.name || "Signed in") + '</span><button id="fbcopy" title="Copy my personal link">My link</button><button id="fbout">Sign out</button>'
         : fb.cfg ? '<button id="fbopen">Sign in</button>' : "") +
+      (fb.key ? '<span class="wsaved">' + (S.group ? "Group: " + esc(S.group) : "No group yet") + "</span>" : "") +
       (fb.last ? '<span class="wsaved">Saved ' + esc(fb.last) + "</span>" : "");
   }
   if (!el) return;
@@ -8775,7 +9188,13 @@ document.addEventListener("change", function (e) {
 // ------------------------------------------------------------------------
 var MKEYS = ["projects", "tasks", "descs", "holidays", "targets"];
 function lockLists() {
-  LISTS_LOCKED = !!fb.master && !(window.adm && adm.user);
+  // with online saving set up, only the admin can edit the lists (everyone else just picks from them)
+  LISTS_LOCKED = !!fb.cfg && !(window.adm && adm.user);
+  var lt = $("t-lists");
+  if (lt) {
+    lt.hidden = LISTS_LOCKED; // only the admin sees the Lists tab when online saving is set up
+    if (LISTS_LOCKED && !$("v-lists").hidden && typeof tab === "function") tab("tracker");
+  }
   var note = $("listhint");
   if (note)
     note.textContent = LISTS_LOCKED
@@ -8792,10 +9211,14 @@ function applyMaster() {
     });
     if (fb.master.groups) S.lists.groups = JSON.parse(JSON.stringify(fb.master.groups));
     if (fb.master.pcodes) S.lists.pcodes = JSON.parse(JSON.stringify(fb.master.pcodes));
+    ["sections", "gproj", "gdesc"].forEach(function (k) {
+      if (fb.master[k]) S.lists[k] = JSON.parse(JSON.stringify(fb.master[k]));
+    });
     ensureLists();
   }
   lockLists();
   if (fb.master && LISTS_LOCKED) _saveLocal();
+  syncGroupSelect();
   fillSelects();
   buildListsTable();
   buildGroupsTable();
@@ -8810,7 +9233,9 @@ function loadMaster() {
       fb.master = d.exists ? d.data() : null;
       applyMaster();
     })
-    .catch(function () {});
+    .catch(function () {
+      applyMaster(); // even if the lists could not be fetched, keep the Lists tab locked
+    });
 }
 var _applyState = applyState;
 applyState = function (o) {
@@ -8825,6 +9250,9 @@ document.addEventListener("click", function (e) {
     o[k] = (S.lists[k] || []).slice();
   });
   o.groups = JSON.parse(JSON.stringify(S.lists.groups));
+  ["sections", "gproj", "gdesc"].forEach(function (k) {
+    o[k] = JSON.parse(JSON.stringify(S.lists[k] || (k === "sections" ? [] : {})));
+  });
   o.pcodes = JSON.parse(JSON.stringify(S.lists.pcodes || {}));
   fb.db
     .collection("config")
@@ -8848,7 +9276,7 @@ fbCfg().then(function (cfg) {
 // console, see FIREBASE.md). Only that email may list, read and delete all records.
 // Normal users never see this.
 // ========================================================================
-var adm = { auth: null, user: null, rows: [], from: "", to: "", busy: false };
+var adm = { auth: null, user: null, rows: [], assign: {}, from: "", to: "", busy: false };
 
 function admInit() {
   return fbInit().then(function () {
@@ -8943,11 +9371,36 @@ function renderAdmin() {
         var o = d.data();
         adm.rows.push({ id: d.id, o: o });
       });
+      return fb.db.collection("assign").get();
+    })
+    .then(function (qa) {
+      adm.assign = {};
+      qa.forEach(function (d) {
+        adm.assign[d.id] = (d.data() || {}).group || "";
+      });
       drawAdmin();
     })
     .catch(function (e) {
       el.innerHTML = "<h2>Admin</h2><p class='hint'>" + esc(admErr(e)) + "</p>";
     });
+}
+function secOf(g) {
+  var o = "";
+  ((S.lists && S.lists.sections) || []).forEach(function (sec) {
+    if (sec.groups.indexOf(g) >= 0) o = sec.name;
+  });
+  return o;
+}
+function groupOpts(cur) {
+  var h = '<option value="">Not assigned</option>';
+  ((S.lists && S.lists.sections) || []).forEach(function (sec) {
+    h += '<optgroup label="' + esc(sec.name) + '">';
+    sec.groups.forEach(function (g) {
+      h += "<option" + (g === cur ? " selected" : "") + ">" + esc(g) + "</option>";
+    });
+    h += "</optgroup>";
+  });
+  return h;
 }
 function drawAdmin() {
   var el = $("adminbox"),
@@ -8957,6 +9410,9 @@ function drawAdmin() {
       .map(function (r) {
         var s = admStats(r.o);
         s.id = r.id;
+        s.group = adm.assign[r.id] || "";
+        if (allGroups().indexOf(s.group) < 0) s.group = ""; // a removed group counts as not assigned
+        s.section = s.group ? secOf(s.group) : "";
         return s;
       })
       .sort(function (a, b) {
@@ -8967,18 +9423,32 @@ function drawAdmin() {
     '<div class="otrow"><label>From<input type="date" id="admfrom" value="' + adm.from + '"></label>' +
     '<label>To<input type="date" id="admto" value="' + adm.to + '"></label>' +
     '<button id="admrefresh">Refresh</button><button id="admcsv">Download summary (CSV)</button><button id="admout">Admin sign out</button></div>' +
-    '<p class="hint">' + list.length + " people. Hours are the logged hours between the dates above. Open a person's link to view or fix their data; it saves back to them.</p>" +
-    '<div class="wrap" style="margin:0"><table class="mini" style="width:100%"><thead><tr><th>Name</th><th>Last saved</th><th>Logged hrs</th><th>Days logged</th><th>Tasks</th><th>All-time hrs</th><th></th></tr></thead><tbody>';
-  list.forEach(function (s) {
-    tot += s.hrs;
-    var link = base ? base + "#k=" + s.id : "";
-    h +=
-      "<tr><td>" + esc(s.name) + "</td><td>" + esc(fbWhen(s.updated)) + "</td><td>" + (Math.round(s.hrs * 100) / 100) + "</td><td>" + s.nd + "</td><td>" + s.tasks + "</td><td>" + (Math.round(s.all * 100) / 100) + "</td><td>" +
-      (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener"><button type="button">Open</button></a> ' : "") +
-      '<button data-adl="' + s.id + '">Copy link</button> <button data-adj="' + s.id + '">Download</button> <button data-add="' + s.id + '" class="del" title="Delete this person\'s saved data">✕</button></td></tr>';
+    '<p class="hint">' + list.length + " people, listed by section and group. Choose a person's group in the Group column; they cannot change it. Hours are the logged hours between the dates above. Open a person's link to view or fix their data; it saves back to them.</p>" +
+    '<div class="wrap" style="margin:0"><table class="mini" style="width:100%"><thead><tr><th>Name</th><th>Group</th><th>Last saved</th><th>Logged hrs</th><th>Days logged</th><th>Tasks</th><th>All-time hrs</th><th></th></tr></thead><tbody>';
+  var block = function (title, people) {
+    var hrs = 0;
+    people.forEach(function (s) {
+      hrs += s.hrs;
+    });
+    h += '<tr class="gh"><td colspan="8"><b>' + esc(title) + "</b> &nbsp;" + people.length + " " + (people.length === 1 ? "person" : "people") + ", " + (Math.round(hrs * 100) / 100) + " hrs</td></tr>";
+    people.forEach(function (s) {
+      tot += s.hrs;
+      var link = base ? base + "#k=" + s.id : "";
+      h +=
+        "<tr><td>" + esc(s.name) + '</td><td><select data-asg="' + s.id + '" aria-label="Group for ' + esc(s.name) + '">' + groupOpts(s.group) + "</select></td><td>" + esc(fbWhen(s.updated)) + "</td><td>" + (Math.round(s.hrs * 100) / 100) + "</td><td>" + s.nd + "</td><td>" + s.tasks + "</td><td>" + (Math.round(s.all * 100) / 100) + "</td><td>" +
+        (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener"><button type="button">Open</button></a> ' : "") +
+        '<button data-adl="' + s.id + '">Copy link</button> <button data-adj="' + s.id + '">Download</button> <button data-add="' + s.id + '" class="del" title="Delete this person\'s saved data">✕</button></td></tr>';
+    });
+  };
+  ((S.lists && S.lists.sections) || []).forEach(function (sec) {
+    sec.groups.forEach(function (g) {
+      block(sec.name + " · " + g, list.filter(function (s) { return s.group === g; }));
+    });
   });
-  if (!list.length) h += '<tr><td colspan="7" class="empty">Nobody has saved online yet.</td></tr>';
-  h += "</tbody><tfoot><tr><td>Total</td><td></td><td>" + (Math.round(tot * 100) / 100) + "</td><td></td><td></td><td></td><td></td></tr></tfoot></table></div>";
+  var un = list.filter(function (s) { return !s.group; });
+  if (un.length) block("Not assigned to a group", un);
+  if (!list.length) h += '<tr><td colspan="8" class="empty">Nobody has saved online yet.</td></tr>';
+  h += "</tbody><tfoot><tr><td>Total</td><td></td><td></td><td>" + (Math.round(tot * 100) / 100) + "</td><td></td><td></td><td></td><td></td></tr></tfoot></table></div>";
   el.innerHTML = h;
   adm.list = list;
 }
@@ -9011,9 +9481,9 @@ document.addEventListener("click", function (e) {
     var q = function (v) {
       return '"' + String(v).replace(/"/g, '""') + '"';
     };
-    var out = ["Name,Last saved,Logged hrs (" + adm.from + " to " + adm.to + "),Days logged,Tasks,All-time hrs"];
+    var out = ["Section,Group,Name,Last saved,Logged hrs (" + adm.from + " to " + adm.to + "),Days logged,Tasks,All-time hrs"];
     (adm.list || []).forEach(function (s) {
-      out.push([q(s.name), q(fbWhen(s.updated)), s.hrs, s.nd, s.tasks, s.all].join(","));
+      out.push([q(s.section), q(s.group), q(s.name), q(fbWhen(s.updated)), s.hrs, s.nd, s.tasks, s.all].join(","));
     });
     saveFile("everyone-" + iso(new Date()) + ".csv", "﻿" + out.join("\r\n"));
   } else if (t.dataset && t.dataset.adl) {
@@ -9033,6 +9503,24 @@ document.addEventListener("click", function (e) {
   }
 });
 document.addEventListener("change", function (e) {
+  var asg = e.target.dataset && e.target.dataset.asg;
+  if (asg) {
+    var g = e.target.value,
+      r = admRow(asg);
+    fb.db
+      .collection("assign")
+      .doc(asg)
+      .set({ group: g, name: (r && r.o.name) || "" })
+      .then(function () {
+        adm.assign[asg] = g;
+        drawAdmin();
+        say("Group saved.");
+      })
+      .catch(function (er) {
+        say(admErr(er));
+      });
+    return;
+  }
   if (e.target.id === "admfrom") adm.from = e.target.value;
   else if (e.target.id === "admto") adm.to = e.target.value;
   else return;

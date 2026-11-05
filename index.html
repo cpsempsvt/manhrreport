@@ -2087,6 +2087,13 @@ table.rep button.lnk { text-align: left; }
 table.rep tr.ex td { opacity: .5; }
 table.rep tr.ex td:first-child { opacity: 1; }
 table.rep td input[data-inc] { width: 13px !important; height: 13px !important; min-height: 0 !important; padding: 0 !important; margin: 0 6px 0 0 !important; display: inline-block !important; position: static !important; vertical-align: middle; accent-color: var(--head); }
+table.rep tr.flt th { background: var(--panel); padding: 4px 6px; }
+table.rep tr.flt select, table.rep tr.flt input { width: 100%; min-height: 30px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); padding: 2px 6px; font-weight: 400; }
+table.rep td.in select[data-mapset] { width: 100%; min-height: 28px; }
+#tmsmaptab td.in select { width: 100%; min-height: 30px; text-align-last: left; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+#tmsmaptab select[disabled] { opacity: .6; }
+#tmsmaptab { table-layout: fixed; width: 100%; }
+#tmsmaptab td.in select, #tmsmaptab tr.flt select { width: 100% !important; max-width: none !important; box-sizing: border-box; }
 </style>
   </head>
   <body>
@@ -7405,7 +7412,12 @@ var DMR_ROWS = [
 var DMR_PRI = ["lv", "brk", "mgmt", "ob", "ind"]; // an item ticked in several rows counts in the first of these
 function tmsUsedNames() {
   var pj = {},
-    tk = {};
+    tk = {},
+    ds = {},
+    cb = {};
+  ((S.lists && S.lists.descs) || []).forEach(function (x) {
+    if (x) ds[x] = 1;
+  });
   ((S.lists && S.lists.projects) || []).forEach(function (x) {
     pj[x] = 1;
   });
@@ -7415,8 +7427,12 @@ function tmsUsedNames() {
   S.items.forEach(function (it) {
     if (it.project) pj[it.project] = 1;
     if (it.task) tk[it.task] = 1;
+    if (it.desc) {
+      ds[it.desc] = 1;
+      cb[(it.task || "") + "\t" + it.desc] = 1;
+    }
   });
-  return { p: Object.keys(pj).sort(), t: Object.keys(tk).sort() };
+  return { p: Object.keys(pj).sort(), t: Object.keys(tk).sort(), d: Object.keys(ds).sort(), c: Object.keys(cb).sort() };
 }
 function tmsDefaultMap() {
   var u = tmsUsedNames(),
@@ -7450,28 +7466,63 @@ function tmsDefaultMap() {
 function tmsMap() {
   return S.tmsMap || tmsDefaultMap();
 }
-function tmsRowOf(map, it) {
-  for (var i = 0; i < DMR_PRI.length; i++) {
-    var l = map[DMR_PRI[i]] || [];
-    if (l.indexOf("t:" + (it.task || "")) >= 0 || l.indexOf("p:" + (it.project || "")) >= 0) return DMR_PRI[i];
-  }
-  return "";
+// rules table: Project | Task | Description | All goes into. A blank cell means "any".
+function tmsMapToRules(map) {
+  var out = [];
+  DMR_PRI.forEach(function (row) {
+    (map[row] || []).forEach(function (k) {
+      var ty = k.charAt(0),
+        n = k.slice(2);
+      if (ty === "p") out.push({ p: n, t: "", d: "", c: row });
+      else if (ty === "t") out.push({ p: "", t: n, d: "", c: row });
+      else if (ty === "d") out.push({ p: "", t: "", d: n, c: row });
+      else if (ty === "c") {
+        var q = n.split("\t");
+        out.push({ p: "", t: q[0], d: q[1] || "", c: row });
+      }
+    });
+  });
+  return out;
+}
+function tmsRules() {
+  return S.tmsRules || tmsMapToRules(tmsMap());
+}
+function tmsLvDays() {
+  if (S.tmsLv) return S.tmsLv;
+  return (tmsMap().lv || [])
+    .filter(function (k) {
+      return k.charAt(0) === "h";
+    })
+    .map(function (k) {
+      return k.slice(2);
+    });
+}
+// the rule with the most filled-in cells that fits the entry wins (project + task + description beats just a task)
+function tmsRowOf(rules, it) {
+  var best = "",
+    bn = 0;
+  rules.forEach(function (r) {
+    var n = (r.p ? 1 : 0) + (r.t ? 1 : 0) + (r.d ? 1 : 0);
+    if (!n || n <= bn || !r.c) return;
+    if (r.p && r.p !== (it.project || "")) return;
+    if (r.t && r.t !== (it.task || "")) return;
+    if (r.d && r.d !== (it.desc || "")) return;
+    best = r.c;
+    bn = n;
+  });
+  return best;
 }
 function tmsDmrData(cols) {
-  var map = tmsMap(),
+  var rules = tmsRules(),
     z = function () {
       return cols.map(function () {
         return 0;
       });
     },
     D = { nom: z(), act: z(), eng: z(), ind: z(), ob: z(), mgmt: z(), brk: z(), lv: z() },
-    lvDays = (map.lv || [])
-      .filter(function (k) {
-        return k.charAt(0) === "h";
-      })
-      .map(function (k) {
-        return k.slice(2).toLowerCase();
-      }),
+    lvDays = tmsLvDays().map(function (k) {
+      return String(k).toLowerCase();
+    }),
     seen = {};
   tmsRanges().forEach(function (x) {
     var l = rangeDays(x[0], x[1]);
@@ -7487,7 +7538,7 @@ function tmsDmrData(cols) {
     });
   });
   S.items.forEach(function (it) {
-    var row = tmsRowOf(map, it),
+    var row = tmsRowOf(rules, it),
       eng = !row && tmsRoleOf(it.project || "") !== "Others";
     Object.keys(it.log || {}).forEach(function (d) {
       var v = num(it.log[d]);
@@ -7567,41 +7618,110 @@ function tmsDmrTable(cols) {
     "</b></td></tr></tbody>";
   return h;
 }
+var tmsMapF = { c: "", q: "" };
+function tmsSelOpts(f, cur, u) {
+  var o = function (v) {
+      return "<option" + (v === cur ? " selected" : "") + ">" + esc(v) + "</option>";
+    },
+    ph = { p: "Project…", t: "Task…", d: "Description…" }[f],
+    h = '<option value="">' + ph + "</option>",
+    seen = {};
+  if (f === "t") {
+    gkeys().concat(COMMON).forEach(function (g) {
+      var l = ((S.lists.groups && S.lists.groups[g]) || []).filter(Boolean);
+      l.forEach(function (t) {
+        seen[t] = 1;
+      });
+      if (l.length) h += '<optgroup label="' + esc(g) + '">' + l.map(o).join("") + "</optgroup>";
+    });
+    var rest = u.t.filter(function (t) {
+      return t && !seen[t];
+    });
+    if (rest.length) h += '<optgroup label="Other">' + rest.map(o).join("") + "</optgroup>";
+    return h;
+  }
+  var l = f === "p" ? u.p : u.d;
+  if (cur && l.indexOf(cur) < 0) l = l.concat([cur]);
+  return h + l.map(o).join("");
+}
 function tmsMapBox() {
   var open = !!tmsOpen.map,
     h =
       '<div class="card" style="margin:0 20px 16px;padding:10px 14px"><button class="lnk" data-tog="map">' +
       (open ? "▾" : "▸") +
-      " Choose which projects, tasks and day types go in each Monthly DMR row</button>";
+      " Choose which projects, tasks and descriptions go in each Monthly DMR row</button>";
   if (!open) return h + "</div>";
   var u = tmsUsedNames(),
-    map = tmsMap(),
-    hol = (S.lists && S.lists.holidays) || [];
-  h += '<p class="hint">Tick what belongs in each row. Eng\'g is everything else logged on a project that has a "Role in the project". Leaves also takes day types (a VL or SL day counts as one normal working day).</p>';
-  DMR_ROWS.forEach(function (x) {
-    var l = map[x[0]] || [],
-      box = function (key, label) {
-        return (
-          '<label class="chk" style="display:inline-flex;margin:2px 10px 2px 0"><input type="checkbox" data-map="' +
-          x[0] +
-          '" data-key="' +
-          esc(key) +
-          '"' +
-          (l.indexOf(key) >= 0 ? " checked" : "") +
-          ">" +
-          esc(label) +
-          "</label>"
-        );
-      };
-    h += "<div style='margin:8px 0'><b>" + x[1] + "</b><br>";
-    h += "<span class='hint'>Projects: </span>" + u.p.map(function (n) { return box("p:" + n, n); }).join("");
-    h += "<br><span class='hint'>Tasks: </span>" + u.t.map(function (n) { return box("t:" + n, n); }).join("");
-    if (x[0] === "lv") h += "<br><span class='hint'>Day types: </span>" + hol.map(function (n) { return box("h:" + n, n); }).join("");
-    h += "</div>";
+    rules = tmsRules(),
+    hol = (S.lists && S.lists.holidays) || [],
+    lv = tmsLvDays(),
+    dl = function (id, l) {
+      return '<datalist id="' + id + '">' + l.map(function (x) { return "<option value=\"" + esc(x) + "\">"; }).join("") + "</datalist>";
+    },
+    catOpts = function (cur, any) {
+      return (
+        '<option value="">' + (any ? "All" : "(choose)") + "</option>" +
+        (any ? '<option value="-">Not assigned</option>' : "") +
+        DMR_ROWS.map(function (x) {
+          return '<option value="' + x[0] + '"' + (cur === x[0] ? " selected" : "") + ">" + x[1] + "</option>";
+        }).join("")
+      );
+    },
+    cell = function (f, i, v) {
+      return '<td class="in"><select data-rf="' + f + '" data-ri="' + i + '">' + tmsSelOpts(f, v || "", u) + "</select></td>";
+    };
+  h +=
+    '<p class="hint">Every project, task and description from the Lists tab is listed at the bottom; choose where it goes and it becomes a rule. Each row is a rule: leave Project…, Task… or Description… unselected to mean "any". Anything that fits a rule goes into "All goes into"; the rule with the most cells filled in wins (so Task = TM Concern Meeting + Description = Morning meeting beats Task = TM Concern Meeting alone). Entries that fit no rule count as Eng\'g when their project has a "Role in the project".</p>' +
+    '<p style="margin:6px 0"><b>Leave day types</b> (a day typed VL, SL ... counts in Leaves): ' +
+    hol
+      .map(function (n) {
+        return '<label class="chk" style="display:inline-flex;margin-right:10px"><input type="checkbox" data-lv="' + esc(n) + '"' + (lv.indexOf(n) >= 0 ? " checked" : "") + ">" + esc(n) + "</label>";
+      })
+      .join("") +
+    "</p>" +
+    '<div style="margin:6px 0"><button data-radd class="primary">Add rule</button></div>' +
+    '<div style="max-height:380px;overflow:auto"><table class="rep" id="tmsmaptab"><thead><tr><th>Project</th><th>Task</th><th>Description</th><th style="width:250px">All goes into</th><th style="width:36px"></th></tr>' +
+    '<tr class="flt"><th colspan="3"><input type="search" data-mf="q" placeholder="Search project, task or description" value="' + esc(tmsMapF.q) + '"></th><th><select data-mf="c">' + catOpts(tmsMapF.c, true) + "</select></th><th></th></tr></thead><tbody>";
+  rules.forEach(function (r, i) {
+    h +=
+      '<tr data-nm="' + esc(((r.p || "") + " " + (r.t || "") + " " + (r.d || "")).toLowerCase()) + '" data-cat="' + (r.c || "") + '">' +
+      cell("p", i, r.p) + cell("t", i, r.t) + cell("d", i, r.d) +
+      '<td class="in"><select data-rf="c" data-ri="' + i + '">' + catOpts(r.c, false) + '</select></td><td><button class="del" data-rdel="' + i + '" title="Remove this rule" aria-label="Remove rule">✕</button></td></tr>';
   });
-  return h + "</div>";
+  // every project, task and description from the Lists tab is listed too; choose a row and it becomes a rule
+  var cov = {};
+  rules.forEach(function (r) {
+    var n = (r.p ? 1 : 0) + (r.t ? 1 : 0) + (r.d ? 1 : 0);
+    if (n === 1) cov[(r.p ? "p:" + r.p : r.t ? "t:" + r.t : "d:" + r.d)] = 1;
+  });
+  [["p", u.p], ["t", u.t], ["d", u.d]].forEach(function (g) {
+    g[1].forEach(function (n) {
+      if (cov[g[0] + ":" + n]) return;
+      var one = function (f) {
+        return '<td class="in"><select disabled>' + (f === g[0] ? "<option>" + esc(n) + "</option>" : '<option>' + { p: "Project…", t: "Task…", d: "Description…" }[f] + "</option>") + "</select></td>";
+      };
+      h +=
+        '<tr data-nm="' + esc(n.toLowerCase()) + '" data-cat="">' + one("p") + one("t") + one("d") +
+        '<td class="in"><select data-rv="' + g[0] + '" data-rn="' + esc(n) + '">' + catOpts("", false) + "</select></td><td></td></tr>";
+    });
+  });
+  if (!rules.length && !u.p.length) h += '<tr><td colspan="5" class="hint" style="padding:12px">No rules yet. Press Add rule.</td></tr>';
+  return h + "</tbody></table></div></div>";
 }
-
+function tmsMapFilter() {
+  var rows = document.querySelectorAll("#tmsmaptab tbody tr[data-nm]"),
+    q = tmsMapF.q.trim().toLowerCase();
+  Array.prototype.forEach.call(rows, function (r) {
+    r.hidden = !(
+      (!q || r.dataset.nm.indexOf(q) >= 0) &&
+      (!tmsMapF.c || (tmsMapF.c === "-" ? r.dataset.cat === "" : r.dataset.cat === tmsMapF.c))
+    );
+  });
+}
+function tmsEditRules() {
+  if (!S.tmsRules) S.tmsRules = JSON.parse(JSON.stringify(tmsRules()));
+  return S.tmsRules;
+}
 function tmsEditRowsPeek(p, tk) {
   return tmsRowsOf(p, tk);
 }
@@ -7615,8 +7735,26 @@ function renderTmsSum(cur, list) {
   $("tmsflat").innerHTML = t[1];
   $("tmsdmr").innerHTML = tmsDmrTable(tmsCols());
   $("tmsmap").innerHTML = tmsMapBox();
+  tmsMapFilter();
 }
 $("tmssum").addEventListener("click", function (e) {
+  var ra = e.target.closest("[data-radd]"),
+    rd = e.target.closest("[data-rdel]");
+  if (ra) {
+    tmsEditRules().unshift({ p: "", t: "", d: "", c: "ind" });
+    tmsMapF = { c: "", q: "" };
+    save();
+    tmsForce = true;
+    renderTms();
+    return;
+  }
+  if (rd) {
+    tmsEditRules().splice(+rd.dataset.rdel, 1);
+    save();
+    tmsForce = true;
+    renderTms();
+    return;
+  }
   var b = e.target.closest("[data-tog]");
   if (!b) return;
   var k = b.dataset.tog;
@@ -7624,15 +7762,43 @@ $("tmssum").addEventListener("click", function (e) {
   tmsForce = true;
   renderTms();
 });
+$("tmssum").addEventListener("input", function (e) {
+  if (e.target.dataset && e.target.dataset.mf === "q") {
+    tmsMapF.q = e.target.value;
+    tmsMapFilter();
+  }
+});
 $("tmssum").addEventListener("change", function (e) {
   var t = e.target;
-  if (t.dataset && t.dataset.map !== undefined) {
-    var mp = S.tmsMap || tmsDefaultMap(),
-      l = mp[t.dataset.map] || (mp[t.dataset.map] = []),
-      ix = l.indexOf(t.dataset.key);
-    if (t.checked && ix < 0) l.push(t.dataset.key);
-    if (!t.checked && ix >= 0) l.splice(ix, 1);
-    S.tmsMap = mp;
+  if (t.dataset && t.dataset.mf !== undefined) {
+    tmsMapF[t.dataset.mf] = t.value;
+    tmsMapFilter();
+    return;
+  }
+  if (t.dataset && t.dataset.rf !== undefined) {
+    var rl = tmsEditRules()[+t.dataset.ri];
+    if (rl) rl[t.dataset.rf] = t.value.trim();
+    save();
+    tmsForce = true;
+    setTimeout(renderTms, 0);
+    return;
+  }
+  if (t.dataset && t.dataset.rv !== undefined) {
+    if (!t.value) return;
+    var nr = { p: "", t: "", d: "", c: t.value };
+    nr[t.dataset.rv] = t.dataset.rn;
+    tmsEditRules().push(nr);
+    save();
+    tmsForce = true;
+    setTimeout(renderTms, 0);
+    return;
+  }
+  if (t.dataset && t.dataset.lv !== undefined) {
+    var lvl = tmsLvDays().slice(),
+      ix = lvl.indexOf(t.dataset.lv);
+    if (t.checked && ix < 0) lvl.push(t.dataset.lv);
+    if (!t.checked && ix >= 0) lvl.splice(ix, 1);
+    S.tmsLv = lvl;
     save();
     tmsForce = true;
     renderTms();

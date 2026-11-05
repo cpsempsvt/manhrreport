@@ -2331,6 +2331,19 @@ table.rep button.lnk { text-align: left; }
 
     <!-- ===== TMS TAB ===== -->
     <section id="v-tms" hidden>
+      <div class="bar" id="tbar">
+        <label>Season year<input type="number" id="tyear" style="width: 90px" /></label>
+        <label class="chk"><input type="checkbox" id="tmid" />Midterm</label>
+        <label class="chk"><input type="checkbox" id="tfin" />Finals</label>
+        <label class="chk"><input type="checkbox" id="tcus" />Date range</label>
+        <label>From<input type="date" id="tfrom" /></label><label>To<input type="date" id="tto" /></label>
+        <button id="tapply" class="primary">Apply</button>
+        <details id="thide" class="dd">
+          <summary>Show / hide</summary>
+          <div class="ddbody" id="thidebody"></div>
+        </details>
+        <span class="hint" id="tlabel" style="padding-bottom: 8px"></span>
+      </div>
       <div class="bar">
         <label
           >Project<select
@@ -6571,6 +6584,52 @@ function f0(v) {
 function pc(v, d) {
   return isFinite(v) ? v.toFixed(d) + "%" : "–";
 }
+// ---- period filter, same idea as the Dashboard: Midterm (Apr 23 - Oct 22), Finals (Oct 23 - Mar 22), Date range ----
+function tmsPer() {
+  return S.tmsPer || { y: (S.dashCfg && S.dashCfg.y) || dashYear(), mid: true, fin: true, cus: false, from: "", to: "" };
+}
+function tmsRanges() {
+  var c = tmsPer(),
+    r = [];
+  if (c.mid) r.push([c.y + "-04-23", c.y + "-10-22"]);
+  if (c.fin) r.push([c.y + "-10-23", c.y + 1 + "-03-22"]);
+  if (c.cus && c.from && c.to && c.from <= c.to) r.push([c.from, c.to]);
+  return r;
+}
+function tmsIn(d) {
+  var r = tmsRanges();
+  for (var i = 0; i < r.length; i++) if (d >= r[i][0] && d <= r[i][1]) return true;
+  return false;
+}
+function tmsHide() {
+  return S.tmsHide || {};
+}
+var TMS_PARTS = [
+  ["over", "All projects"],
+  ["proj", "Selected project (details and work scope table)"],
+  ["month", "Hours per month"],
+  ["flat", "Project and work scope"],
+];
+function tmsBar() {
+  var c = tmsPer(),
+    h = tmsHide();
+  setv("tyear", c.y);
+  $("tmid").checked = !!c.mid;
+  $("tfin").checked = !!c.fin;
+  $("tcus").checked = !!c.cus;
+  setv("tfrom", c.from || "");
+  setv("tto", c.to || "");
+  $("tlabel").textContent =
+    "Midterm: Apr 23 – Oct 22 · Finals: Oct 23 – Mar 22 (next year). Everything on this tab uses these dates. Change the options, then press Apply.";
+  $("thidebody").innerHTML = TMS_PARTS.map(function (x) {
+    return '<label class="chk"><input type="checkbox" data-th="' + x[0] + '"' + (h[x[0]] ? "" : " checked") + ">" + x[1] + "</label>";
+  }).join("");
+  $("tmsover").parentNode.hidden = !!h.over;
+  $("tmshead").parentNode.hidden = !!h.proj;
+  $("tmstab").hidden = !!h.proj;
+  $("tmsmonth").parentNode.hidden = !!h.month;
+  $("tmsflat").parentNode.hidden = !!h.flat;
+}
 function tmsNorm(t) {
   return String(t || "")
     .toLowerCase()
@@ -6618,7 +6677,7 @@ function tmsGroups(p) {
     if ((it.project || "") !== p) return;
     ["log", "est"].forEach(function (kk) {
       Object.keys(it[kk] || {}).forEach(function (d) {
-        if (!(num(it[kk][d]) > 0)) return;
+        if (!(num(it[kk][d]) > 0) || !tmsIn(d)) return;
         var t = tgOf(it, d);
         if (t) {
           tg[t] = 1;
@@ -6706,7 +6765,7 @@ function tmsCalc(p, tk) {
     ["log", "est"].forEach(function (kk) {
       Object.keys(it[kk] || {}).forEach(function (d) {
         var v = num(it[kk][d]);
-        if (!v) return;
+        if (!v || !tmsIn(d)) return;
         if (tk !== undefined && tgOf(it, d) !== tk) return;
         if (from && d < from) return;
         if (to && d > to) return;
@@ -6804,6 +6863,7 @@ function renderTms() {
           })
           .join("")
       : '<option value="">(no projects)</option>';
+  tmsBar();
   setv("tmswarn", warn);
   $("tmsnom").value = num(S.tmsNom) > 0 ? S.tmsNom : "";
   $("tmsnom").placeholder = "auto";
@@ -7032,29 +7092,62 @@ function renderTms() {
 // Two summary tables: hours per month by category, and project / work scope totals
 // ------------------------------------------------------------------------
 var TMS_MON = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
-function tmsFy() {
-  if (S.tmsFy) return S.tmsFy;
-  var n = new Date();
-  return n.getMonth() >= 3 ? n.getFullYear() : n.getFullYear() - 1;
+// months are the 23rd-to-22nd periods, named after the month they start in (Apr = Apr 23 - May 22)
+function tmsPeriodKey(d) {
+  var y = +d.slice(0, 4),
+    m = +d.slice(5, 7);
+  if (+d.slice(8, 10) < 23) {
+    m--;
+    if (m < 1) {
+      m = 12;
+      y--;
+    }
+  }
+  return y + "-" + (m < 10 ? "0" : "") + m;
+}
+function tmsCols() {
+  var r = tmsRanges();
+  if (!r.length) return [];
+  var lo = r[0][0],
+    hi = r[0][1];
+  r.forEach(function (x) {
+    if (x[0] < lo) lo = x[0];
+    if (x[1] > hi) hi = x[1];
+  });
+  var k = tmsPeriodKey(lo),
+    end = tmsPeriodKey(hi),
+    cols = [];
+  while (k <= end && cols.length < 60) {
+    cols.push(k);
+    var y = +k.slice(0, 4),
+      m = +k.slice(5, 7) + 1;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+    k = y + "-" + (m < 10 ? "0" : "") + m;
+  }
+  return cols;
 }
 function tmsRoleOf(p) {
-  return String((tmsCfg(p).role || "")).trim() || "Others";
+  return String(tmsCfg(p).role || "").trim() || "Others";
 }
-// logged hours of every project by target > category (the project's "Role in the project") > fiscal month
-function tmsMonthly(fy) {
-  var from = fy + "-04-01",
-    to = fy + 1 + "-03-31",
-    res = {};
+// logged hours of every project by target > category (the project's "Role in the project") > period column
+function tmsMonthly(cols) {
+  var res = {};
   S.items.forEach(function (it) {
     var cat = tmsRoleOf(it.project || "");
     Object.keys(it.log || {}).forEach(function (d) {
       var v = num(it.log[d]);
-      if (!v || d < from || d > to) return;
-      var tk = tgOf(it, d) || "",
-        m = (+d.slice(5, 7) + 8) % 12; // Apr = 0 ... Mar = 11
+      if (!v || !tmsIn(d)) return;
+      var ci = cols.indexOf(tmsPeriodKey(d));
+      if (ci < 0) return;
+      var tk = tgOf(it, d) || "";
       res[tk] = res[tk] || {};
-      res[tk][cat] = res[tk][cat] || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-      res[tk][cat][m] += v;
+      res[tk][cat] = res[tk][cat] || cols.map(function () {
+        return 0;
+      });
+      res[tk][cat][ci] += v;
     });
   });
   return res;
@@ -7069,41 +7162,51 @@ function tmsTgOrder(keys) {
     return x - y || (a < b ? -1 : 1);
   });
 }
-// the overall nominal man-hours: the figure typed in the bar, else every working day of the fiscal year
-function tmsNomAll(fy) {
+// the overall nominal man-hours: the figure typed in the bar, else every working day in the chosen dates
+function tmsNomAll() {
   if (num(S.tmsNom) > 0) return num(S.tmsNom);
-  var t = 0;
-  rangeDays(fy + "-04-01", fy + 1 + "-03-31").forEach(function (d) {
-    t += nomOf(d);
+  var t = 0,
+    seen = {};
+  tmsRanges().forEach(function (x) {
+    var l = rangeDays(x[0], x[1]);
+    if (l.length > 800) l = l.slice(0, 800);
+    l.forEach(function (d) {
+      if (seen[d]) return;
+      seen[d] = 1;
+      t += nomOf(d);
+    });
   });
   return t;
 }
 var tmsOpen = {};
 function tmsSumTables(cur, list) {
-  var fy = tmsFy(),
-    nomAll = tmsNomAll(fy),
+  var cols = tmsCols(),
+    nomAll = tmsNomAll(),
+    MN3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    lab = function (k) {
+      var m = +k.slice(5, 7);
+      return MN3[m - 1] + (cols.length > 12 ? " '" + k.slice(2, 4) : "");
+    },
     h1 =
-      '<caption><b>Hours per month</b> · fiscal year <input type="number" id="tmsfy" min="2000" max="2100" step="1" value="' +
-      fy +
-      '" style="width:80px"> (Apr ' +
-      fy +
-      " – Mar " +
-      (fy + 1) +
-      ') <span class="hint">· Category = the project\'s "Role in the project" (no role = Others) · Volume % = hours ÷ nominal man-hours (' +
+      '<caption><b>Hours per month</b> <span class="hint">· each month runs from the 23rd to the 22nd, named after the month it starts in (Apr = Apr 23 – May 22) · Category = the project\'s "Role in the project" (no role = Others) · Volume % = hours ÷ nominal man-hours (' +
       f0(nomAll) +
       ")</span></caption><thead><tr><th>Targets</th><th>Category</th>" +
-      TMS_MON.map(function (m) {
-        return "<th>" + m + "</th>";
-      }).join("") +
+      cols
+        .map(function (k) {
+          return "<th>" + lab(k) + "</th>";
+        })
+        .join("") +
       "<th>Total<br>Man-hour</th><th>Volume<br>%</th></tr></thead><tbody>",
-    mon = tmsMonthly(fy),
+    mon = tmsMonthly(cols),
     tks = tmsTgOrder(Object.keys(mon)),
-    gm = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    gm = cols.map(function () {
+      return 0;
+    }),
     gt = 0,
     vol = function (v) {
       return nomAll > 0 ? pc((v / nomAll) * 100, 2) : "–";
     };
-  if (!tks.length) h1 += '<tr><td colspan="16" class="hint" style="padding:14px">No logged hours in this fiscal year.</td></tr>';
+  if (!tks.length) h1 += '<tr><td colspan="' + (cols.length + 4) + '" class="hint" style="padding:14px">No logged hours in these dates.</td></tr>';
   tks.forEach(function (tk) {
     var cats = Object.keys(mon[tk]).sort(function (a, b) {
       if (a === "Others") return 1;
@@ -7285,13 +7388,6 @@ $("tmssum").addEventListener("click", function (e) {
 });
 $("tmssum").addEventListener("change", function (e) {
   var t = e.target;
-  if (t.id === "tmsfy") {
-    S.tmsFy = Math.min(2100, Math.max(2000, Math.round(num(t.value)) || tmsFy()));
-    save();
-    tmsForce = true;
-    renderTms();
-    return;
-  }
   if (t.dataset && t.dataset.sp !== undefined) {
     var r = tmsEditRows(t.dataset.sp, t.dataset.tk || "")[+t.dataset.ti];
     if (!r) return;
@@ -7307,6 +7403,34 @@ $("tmsproj").onchange = function () {
   save();
   renderTms();
 };
+$("tapply").onclick = function () {
+  var y = parseInt($("tyear").value, 10),
+    m = $("tmid").checked,
+    f = $("tfin").checked,
+    cu = $("tcus").checked,
+    a = $("tfrom").value,
+    b = $("tto").value;
+  if (!m && !f && !cu) return say("Tick at least one of Midterm, Finals or Date range.");
+  if ((m || f) && !(y > 1999 && y < 2100)) return say("Enter a season year such as 2026.");
+  if (cu && (!a || !b || a > b)) return say("Pick a From and To date for the date range (From must not be after To).");
+  S.tmsPer = { y: y > 1999 && y < 2100 ? y : tmsPer().y, mid: m, fin: f, cus: cu, from: a, to: b };
+  save();
+  tmsForce = true;
+  renderTms();
+  say("TMS updated.");
+};
+$("thidebody").addEventListener("change", function (e) {
+  var k = e.target.dataset && e.target.dataset.th;
+  if (!k) return;
+  S.tmsHide = S.tmsHide || {};
+  S.tmsHide[k] = !e.target.checked;
+  save();
+  renderTms();
+});
+document.addEventListener("click", function (e) {
+  var d = $("thide");
+  if (d.open && !d.contains(e.target)) d.open = false;
+});
 $("tmsnom").onchange = function () {
   if (num(this.value) > 0) S.tmsNom = num(this.value);
   else delete S.tmsNom;

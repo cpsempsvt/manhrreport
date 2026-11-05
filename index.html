@@ -2383,6 +2383,8 @@ table.rep td input[data-inc] { width: 13px !important; height: 13px !important; 
       <div id="tmssum">
         <div class="wrap"><table id="tmsmonth" class="rep"></table></div>
         <div class="wrap"><table id="tmsflat" class="rep"></table></div>
+        <div class="wrap"><table id="tmsdmr" class="rep"></table></div>
+        <div id="tmsmap"></div>
       </div>
       <div class="add">
         <input
@@ -6613,6 +6615,7 @@ var TMS_PARTS = [
   ["proj", "Selected project (details and work scope table)"],
   ["month", "Hours per month"],
   ["flat", "Project and work scope"],
+  ["dmr", "Monthly DMR (Nominal, Actual, Eng'g ...)"],
 ];
 function tmsBar() {
   var c = tmsPer(),
@@ -6633,6 +6636,8 @@ function tmsBar() {
   $("tmstab").hidden = !!h.proj;
   $("tmsmonth").parentNode.hidden = !!h.month;
   $("tmsflat").parentNode.hidden = !!h.flat;
+  $("tmsdmr").parentNode.hidden = !!h.dmr;
+  $("tmsmap").hidden = !!h.dmr;
 }
 function tmsNorm(t) {
   return String(t || "")
@@ -7385,6 +7390,217 @@ function tmsSumTables(cur, list) {
   h2 += "</tbody>";
   return [h1, h2];
 }
+
+// ------------------------------------------------------------------------
+// Monthly DMR table: Nominal, Actual, Eng'g, Indirect, Official Business, Management Concern, Break, Leaves
+// Rows other than Eng'g are filled from the projects / tasks / day types the user ticks (S.tmsMap).
+// ------------------------------------------------------------------------
+var DMR_ROWS = [
+  ["ind", "Indirect"],
+  ["ob", "Official Business"],
+  ["mgmt", "Management Concern"],
+  ["brk", "Break"],
+  ["lv", "Leaves"],
+];
+var DMR_PRI = ["lv", "brk", "mgmt", "ob", "ind"]; // an item ticked in several rows counts in the first of these
+function tmsUsedNames() {
+  var pj = {},
+    tk = {};
+  ((S.lists && S.lists.projects) || []).forEach(function (x) {
+    pj[x] = 1;
+  });
+  ((S.lists && S.lists.tasks) || []).forEach(function (x) {
+    tk[x] = 1;
+  });
+  S.items.forEach(function (it) {
+    if (it.project) pj[it.project] = 1;
+    if (it.task) tk[it.task] = 1;
+  });
+  return { p: Object.keys(pj).sort(), t: Object.keys(tk).sort() };
+}
+function tmsDefaultMap() {
+  var u = tmsUsedNames(),
+    m = { ind: [], ob: [], mgmt: [], brk: [], lv: [] },
+    add = function (row, key, name, re) {
+      if (re.test(name)) m[row].push(key);
+    };
+  u.p.concat(u.t).forEach(function () {});
+  u.p.forEach(function (n) {
+    add("lv", "p:" + n, n, /^(vl|sl)$|leave/i);
+    add("brk", "p:" + n, n, /break/i);
+    add("mgmt", "p:" + n, n, /concern/i);
+    add("ob", "p:" + n, n, /official business|^ob$/i);
+  });
+  u.t.forEach(function (n) {
+    add("lv", "t:" + n, n, /leave/i);
+    add("brk", "t:" + n, n, /break/i);
+    add("mgmt", "t:" + n, n, /concern/i);
+    add("ob", "t:" + n, n, /official business/i);
+  });
+  ((S.lists && S.lists.holidays) || []).forEach(function (n) {
+    if (/^(vl|sl)$|leave/i.test(n)) m.lv.push("h:" + n);
+  });
+  return m;
+}
+function tmsMap() {
+  return S.tmsMap || tmsDefaultMap();
+}
+function tmsRowOf(map, it) {
+  for (var i = 0; i < DMR_PRI.length; i++) {
+    var l = map[DMR_PRI[i]] || [];
+    if (l.indexOf("t:" + (it.task || "")) >= 0 || l.indexOf("p:" + (it.project || "")) >= 0) return DMR_PRI[i];
+  }
+  return "";
+}
+function tmsDmrData(cols) {
+  var map = tmsMap(),
+    z = function () {
+      return cols.map(function () {
+        return 0;
+      });
+    },
+    D = { nom: z(), act: z(), eng: z(), ind: z(), ob: z(), mgmt: z(), brk: z(), lv: z() },
+    lvDays = (map.lv || [])
+      .filter(function (k) {
+        return k.charAt(0) === "h";
+      })
+      .map(function (k) {
+        return k.slice(2).toLowerCase();
+      }),
+    seen = {};
+  tmsRanges().forEach(function (x) {
+    var l = rangeDays(x[0], x[1]);
+    if (l.length > 800) l = l.slice(0, 800);
+    l.forEach(function (d) {
+      if (seen[d]) return;
+      seen[d] = 1;
+      var ci = cols.indexOf(tmsPeriodKey(d));
+      if (ci < 0) return;
+      D.nom[ci] += nomOf(d);
+      var h = String((S.ts && S.ts[d] && S.ts[d].h) || "").trim().toLowerCase();
+      if (h && lvDays.indexOf(h) >= 0) {
+        var b = baseNom(d);
+        D.nom[ci] += b; // a leave day still counts in the nominal hours
+        D.lv[ci] += b;
+      }
+    });
+  });
+  S.items.forEach(function (it) {
+    var row = tmsRowOf(map, it),
+      eng = !row && tmsRoleOf(it.project || "") !== "Others";
+    Object.keys(it.log || {}).forEach(function (d) {
+      var v = num(it.log[d]);
+      if (!v || !tmsIn(d)) return;
+      var ci = cols.indexOf(tmsPeriodKey(d));
+      if (ci < 0 || tmsEx(tgOf(it, d) || "")) return;
+      if (row) D[row][ci] += v;
+      else if (eng) D.eng[ci] += v;
+      if (row !== "lv") D.act[ci] += v; // leave time is not worked time
+    });
+  });
+  return D;
+}
+function tmsDmrTable(cols) {
+  var D = tmsDmrData(cols),
+    MN3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    open = tmsOpen["t|dmr"] !== false,
+    r = tmsRanges(),
+    h =
+      '<caption><button class="lnk" data-tog="t|dmr">' +
+      (open ? "▾" : "▸") +
+      ' <b>Monthly DMR</b></button> <span class="hint">· DMR % = Eng\'g ÷ (Nominal − Leaves − Break) · Total column: hours added up, DMR averaged over the months with hours · uses the Target ticks above</span></caption>';
+  if (!open) return h;
+  h +=
+    "<thead><tr><th>Category</th>" +
+    cols
+      .map(function (k) {
+        return "<th>" + MN3[+k.slice(5, 7) - 1] + (cols.length > 12 ? " '" + k.slice(2, 4) : "") + "</th>";
+      })
+      .join("") +
+    "<th>Total<br>Man-hours</th></tr></thead><tbody>";
+  var line = function (name, a) {
+    var t = 0;
+    a.forEach(function (v) {
+      t += v;
+    });
+    h +=
+      "<tr><td class='l'>" +
+      name +
+      "</td>" +
+      a
+        .map(function (v) {
+          return "<td>" + (v ? f0(v) : v === 0 ? "0" : "") + "</td>";
+        })
+        .join("") +
+      "<td>" +
+      f0(t) +
+      "</td></tr>";
+  };
+  line("Nominal", D.nom);
+  line("Actual", D.act);
+  line("Eng'g", D.eng);
+  DMR_ROWS.forEach(function (x) {
+    line(x[1] === "Management Concern" ? "Management Concern" : x[1], D[x[0]]);
+  });
+  var dm = cols.map(function (k, i) {
+      var den = D.nom[i] - D.lv[i] - D.brk[i];
+      return den > 0 && (D.act[i] || D.eng[i]) ? (D.eng[i] / den) * 100 : null;
+    }),
+    n = 0,
+    sum = 0;
+  dm.forEach(function (v) {
+    if (v !== null) {
+      n++;
+      sum += v;
+    }
+  });
+  h +=
+    "<tr class='np'><td class='l'><b>DMR (%)</b></td>" +
+    dm
+      .map(function (v) {
+        return "<td><b>" + (v === null ? "" : pc(v, 2)) + "</b></td>";
+      })
+      .join("") +
+    "<td><b>" +
+    (n ? pc(sum / n, 2) + " (Ave.)" : "–") +
+    "</b></td></tr></tbody>";
+  return h;
+}
+function tmsMapBox() {
+  var open = !!tmsOpen.map,
+    h =
+      '<div class="card" style="margin:0 20px 16px;padding:10px 14px"><button class="lnk" data-tog="map">' +
+      (open ? "▾" : "▸") +
+      " Choose which projects, tasks and day types go in each Monthly DMR row</button>";
+  if (!open) return h + "</div>";
+  var u = tmsUsedNames(),
+    map = tmsMap(),
+    hol = (S.lists && S.lists.holidays) || [];
+  h += '<p class="hint">Tick what belongs in each row. Eng\'g is everything else logged on a project that has a "Role in the project". Leaves also takes day types (a VL or SL day counts as one normal working day).</p>';
+  DMR_ROWS.forEach(function (x) {
+    var l = map[x[0]] || [],
+      box = function (key, label) {
+        return (
+          '<label class="chk" style="display:inline-flex;margin:2px 10px 2px 0"><input type="checkbox" data-map="' +
+          x[0] +
+          '" data-key="' +
+          esc(key) +
+          '"' +
+          (l.indexOf(key) >= 0 ? " checked" : "") +
+          ">" +
+          esc(label) +
+          "</label>"
+        );
+      };
+    h += "<div style='margin:8px 0'><b>" + x[1] + "</b><br>";
+    h += "<span class='hint'>Projects: </span>" + u.p.map(function (n) { return box("p:" + n, n); }).join("");
+    h += "<br><span class='hint'>Tasks: </span>" + u.t.map(function (n) { return box("t:" + n, n); }).join("");
+    if (x[0] === "lv") h += "<br><span class='hint'>Day types: </span>" + hol.map(function (n) { return box("h:" + n, n); }).join("");
+    h += "</div>";
+  });
+  return h + "</div>";
+}
+
 function tmsEditRowsPeek(p, tk) {
   return tmsRowsOf(p, tk);
 }
@@ -7396,6 +7612,8 @@ function renderTmsSum(cur, list) {
   tmsForce = false;
   $("tmsmonth").innerHTML = t[0];
   $("tmsflat").innerHTML = t[1];
+  $("tmsdmr").innerHTML = tmsDmrTable(tmsCols());
+  $("tmsmap").innerHTML = tmsMapBox();
 }
 $("tmssum").addEventListener("click", function (e) {
   var b = e.target.closest("[data-tog]");
@@ -7407,6 +7625,18 @@ $("tmssum").addEventListener("click", function (e) {
 });
 $("tmssum").addEventListener("change", function (e) {
   var t = e.target;
+  if (t.dataset && t.dataset.map !== undefined) {
+    var mp = S.tmsMap || tmsDefaultMap(),
+      l = mp[t.dataset.map] || (mp[t.dataset.map] = []),
+      ix = l.indexOf(t.dataset.key);
+    if (t.checked && ix < 0) l.push(t.dataset.key);
+    if (!t.checked && ix >= 0) l.splice(ix, 1);
+    S.tmsMap = mp;
+    save();
+    tmsForce = true;
+    renderTms();
+    return;
+  }
   if (t.dataset && t.dataset.inc !== undefined) {
     S.tmsExcl = S.tmsExcl || {};
     if (t.checked) delete S.tmsExcl[t.dataset.inc];

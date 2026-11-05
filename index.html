@@ -2086,7 +2086,7 @@ table.rep button.lnk { text-align: left; }
 
 table.rep tr.ex td { opacity: .5; }
 table.rep tr.ex td:first-child { opacity: 1; }
-table.rep td input[data-inc] { margin-right: 4px; vertical-align: middle; }
+table.rep td input[data-inc] { width: 13px !important; height: 13px !important; min-height: 0 !important; padding: 0 !important; margin: 0 6px 0 0 !important; display: inline-block !important; position: static !important; vertical-align: middle; accent-color: var(--head); }
 </style>
   </head>
   <body>
@@ -7248,7 +7248,7 @@ function tmsSumTables(cur, list) {
         "<td>" +
         f0(t) +
         "</td><td>" +
-        vol(t) +
+        (ex ? "–" : vol(t)) +
         "</td></tr>";
     });
   });

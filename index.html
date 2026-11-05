@@ -7421,24 +7421,22 @@ function tmsUsedNames() {
 function tmsDefaultMap() {
   var u = tmsUsedNames(),
     m = { ind: [], ob: [], mgmt: [], brk: [], lv: [] },
-    add = function (row, key, name, re) {
-      if (re.test(name)) m[row].push(key);
+    rx = {
+      lv: /^(vl|sl)$|sick leave|vacation leave|leave/i,
+      brk: /coffee break|break/i,
+      mgmt: /morning|meeting|concern/i,
+      ob: /^ob$|official business/i,
     };
-  u.p.concat(u.t).forEach(function () {});
-  u.p.forEach(function (n) {
-    add("lv", "p:" + n, n, /^(vl|sl)$|leave/i);
-    add("brk", "p:" + n, n, /break/i);
-    add("mgmt", "p:" + n, n, /concern/i);
-    add("ob", "p:" + n, n, /official business|^ob$/i);
-  });
-  u.t.forEach(function (n) {
-    add("lv", "t:" + n, n, /leave/i);
-    add("brk", "t:" + n, n, /break/i);
-    add("mgmt", "t:" + n, n, /concern/i);
-    add("ob", "t:" + n, n, /official business/i);
+  ["lv", "brk", "mgmt", "ob"].forEach(function (row) {
+    u.p.forEach(function (n) {
+      if (rx[row].test(n)) m[row].push("p:" + n);
+    });
+    u.t.forEach(function (n) {
+      if (rx[row].test(n)) m[row].push("t:" + n);
+    });
   });
   ((S.lists && S.lists.holidays) || []).forEach(function (n) {
-    if (/^(vl|sl)$|leave/i.test(n)) m.lv.push("h:" + n);
+    if (rx.lv.test(n)) m.lv.push("h:" + n);
   });
   return m;
 }

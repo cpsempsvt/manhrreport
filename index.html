@@ -7435,6 +7435,13 @@ function tmsDefaultMap() {
       if (rx[row].test(n)) m[row].push("t:" + n);
     });
   });
+  // everything listed under the Official Business and TM Concerns groups in the Lists tab
+  [["ob", "Official Business"], ["mgmt", "TM Concerns"]].forEach(function (x) {
+    ((S.lists && S.lists.groups && S.lists.groups[x[1]]) || []).forEach(function (a) {
+      var n = typeof a === "string" ? a : a && (a.n || a.name || a.t);
+      if (n && m[x[0]].indexOf("t:" + n) < 0) m[x[0]].push("t:" + n);
+    });
+  });
   ((S.lists && S.lists.holidays) || []).forEach(function (n) {
     if (rx.lv.test(n)) m.lv.push("h:" + n);
   });
@@ -7474,13 +7481,9 @@ function tmsDmrData(cols) {
       seen[d] = 1;
       var ci = cols.indexOf(tmsPeriodKey(d));
       if (ci < 0) return;
-      D.nom[ci] += nomOf(d);
+      D.nom[ci] += nomOf(d); // the same figure as the Nominal row on the Tracker tab (leave and holiday days are already 0)
       var h = String((S.ts && S.ts[d] && S.ts[d].h) || "").trim().toLowerCase();
-      if (h && lvDays.indexOf(h) >= 0) {
-        var b = baseNom(d);
-        D.nom[ci] += b; // a leave day still counts in the nominal hours
-        D.lv[ci] += b;
-      }
+      if (h && lvDays.indexOf(h) >= 0) D.lv[ci] += baseNom(d);
     });
   });
   S.items.forEach(function (it) {
@@ -7506,7 +7509,7 @@ function tmsDmrTable(cols) {
     h =
       '<caption><button class="lnk" data-tog="t|dmr">' +
       (open ? "▾" : "▸") +
-      ' <b>Monthly DMR</b></button> <span class="hint">· DMR % = Eng\'g ÷ (Nominal − Leaves − Break) · Total column: hours added up, DMR averaged over the months with hours · uses the Target ticks above</span></caption>';
+      ' <b>Monthly DMR</b></button> <span class="hint">· DMR % = Eng\'g ÷ (Nominal − Break); Nominal is the one on the Tracker tab, which already leaves out leave days · Total column: hours added up, DMR averaged over the months with hours · uses the Target ticks above</span></caption>';
   if (!open) return h;
   h +=
     "<thead><tr><th>Category</th>" +
@@ -7541,7 +7544,7 @@ function tmsDmrTable(cols) {
     line(x[1] === "Management Concern" ? "Management Concern" : x[1], D[x[0]]);
   });
   var dm = cols.map(function (k, i) {
-      var den = D.nom[i] - D.lv[i] - D.brk[i];
+      var den = D.nom[i] - D.brk[i]; // Nominal already leaves out leave days
       return den > 0 && (D.act[i] || D.eng[i]) ? (D.eng[i] / den) * 100 : null;
     }),
     n = 0,

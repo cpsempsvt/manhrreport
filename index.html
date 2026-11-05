@@ -2083,6 +2083,10 @@ table.mini select { min-height: 30px; border: 1px solid var(--line); border-radi
 
 table.rep tr.tgrow td { background: var(--task); font-weight: 700; }
 table.rep button.lnk { text-align: left; }
+
+table.rep tr.ex td { opacity: .5; }
+table.rep tr.ex td:first-child { opacity: 1; }
+table.rep td input[data-inc] { margin-right: 4px; vertical-align: middle; }
 </style>
   </head>
   <body>
@@ -7179,6 +7183,12 @@ function tmsNomAll() {
   return t;
 }
 var tmsOpen = {};
+function tmsEx(tk) {
+  return !!(S.tmsExcl && S.tmsExcl[tk]);
+}
+function tmsInc(tk) {
+  return '<input type="checkbox" data-inc="' + esc(tk) + '"' + (tmsEx(tk) ? "" : " checked") + ' title="Include this target in the totals" aria-label="Include target">';
+}
 function tmsSumTables(cur, list) {
   var cols = tmsCols(),
     nomAll = tmsNomAll(),
@@ -7188,7 +7198,7 @@ function tmsSumTables(cur, list) {
       return MN3[m - 1] + (cols.length > 12 ? " '" + k.slice(2, 4) : "");
     },
     h1 =
-      '<caption><b>Hours per month</b> <span class="hint">· each month runs from the 23rd to the 22nd, named after the month it starts in (Apr = Apr 23 – May 22) · Category = the project\'s "Role in the project" (no role = Others) · Volume % = hours ÷ nominal man-hours (' +
+      '<caption><b>Hours per month</b> <span class="hint">· each month runs from the 23rd to the 22nd, named after the month it starts in (Apr = Apr 23 – May 22) · Category = the project\'s "Role in the project" (no role = Others) · Tick a target to include it in the totals · Volume % = hours ÷ nominal man-hours (' +
       f0(nomAll) +
       ")</span></caption><thead><tr><th>Targets</th><th>Category</th>" +
       cols
@@ -7216,14 +7226,17 @@ function tmsSumTables(cur, list) {
     cats.forEach(function (c, ri) {
       var m = mon[tk][c],
         t = 0;
+      var ex = tmsEx(tk);
       m.forEach(function (v, i) {
         t += v;
-        gm[i] += v;
+        if (!ex) gm[i] += v;
       });
-      gt += t;
+      if (!ex) gt += t;
       h1 +=
-        "<tr><td class='l'>" +
-        (ri === 0 ? esc(tk || "(no target)") : "") +
+        "<tr" +
+        (ex ? ' class="ex"' : "") +
+        "><td class='l'>" +
+        (ri === 0 ? tmsInc(tk) + " " + esc(tk || "(no target)") : "") +
         "</td><td class='l'>" +
         esc(c) +
         "</td>" +
@@ -7346,11 +7359,17 @@ function tmsSumTables(cur, list) {
             "</td></tr>";
         });
     });
-    G.e += tt.e;
-    G.p += tt.p;
-    G.a += tt.a;
+    if (!tmsEx(tk)) {
+      G.e += tt.e;
+      G.p += tt.p;
+      G.a += tt.a;
+    }
     h2 +=
-      '<tr class="tgrow"><td class="l"><button class="lnk" data-tog="' +
+      '<tr class="tgrow' +
+      (tmsEx(tk) ? " ex" : "") +
+      '"><td class="l">' +
+      tmsInc(tk) +
+      ' <button class="lnk" data-tog="' +
       esc(kT) +
       '">' +
       (oT ? "▾" : "▸") +
@@ -7388,6 +7407,15 @@ $("tmssum").addEventListener("click", function (e) {
 });
 $("tmssum").addEventListener("change", function (e) {
   var t = e.target;
+  if (t.dataset && t.dataset.inc !== undefined) {
+    S.tmsExcl = S.tmsExcl || {};
+    if (t.checked) delete S.tmsExcl[t.dataset.inc];
+    else S.tmsExcl[t.dataset.inc] = true;
+    save();
+    tmsForce = true;
+    renderTms();
+    return;
+  }
   if (t.dataset && t.dataset.sp !== undefined) {
     var r = tmsEditRows(t.dataset.sp, t.dataset.tk || "")[+t.dataset.ti];
     if (!r) return;

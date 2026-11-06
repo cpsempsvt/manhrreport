@@ -7499,15 +7499,17 @@ function tmsLvDays() {
 }
 // the rule with the most filled-in cells that fits the entry wins (project + task + description beats just a task)
 function tmsRowOf(rules, it) {
-  var best = null,
+  // every rule that fits with the most cells filled in; two such rules mean the hours count in both rows
+  var best = [],
     bn = 0;
   rules.forEach(function (r) {
     var n = (r.p ? 1 : 0) + (r.t ? 1 : 0) + (r.d ? 1 : 0);
-    if (!n || n <= bn || !(r.c || r.sp)) return;
+    if (!n || n < bn || !(r.c || r.sp)) return;
     if (r.p && r.p !== (it.project || "")) return;
     if (r.t && r.t !== (it.task || "")) return;
     if (r.d && r.d !== (it.desc || "")) return;
-    best = r;
+    if (n > bn) best = [];
+    best.push(r);
     bn = n;
   });
   return best;
@@ -7542,33 +7544,40 @@ function tmsDmrData(cols) {
     });
   });
   S.items.forEach(function (it) {
-    var rule = tmsRowOf(rules, it),
-      row = rule && !rule.sp ? rule.c : "",
-      eng = !rule && tmsRoleOf(it.project || "") !== "Others";
+    var hit = tmsRowOf(rules, it),
+      eng = !hit.length && tmsRoleOf(it.project || "") !== "Others",
+      what = (it.project || "") + (it.task ? " / " + it.task : "");
     Object.keys(it.log || {}).forEach(function (d) {
       var v = num(it.log[d]);
       if (!v || !tmsIn(d)) return;
       var ci = cols.indexOf(tmsPeriodKey(d));
       if (ci < 0 || tmsEx(tgOf(it, d) || "")) return;
-      var lvPart = row === "lv" ? v : 0;
-      if (row === "lv") D.lvInfo[ci].push(d + " – " + ((it.project || "") + (it.task ? " / " + it.task : "")) + " (" + f0(v) + " h)");
-      if (rule && rule.sp) {
-        // the hours of this entry are shared between rows by percentage; what is left stays in Eng'g
-        var rem = 100;
-        DMR_PRI.forEach(function (c) {
-          var pc = num(rule.sp[c]);
-          if (pc > 0) {
-            D[c][ci] += (v * pc) / 100;
-            rem -= pc;
-            if (c === "lv") {
-              lvPart += (v * pc) / 100;
-              D.lvInfo[ci].push(d + " – " + ((it.project || "") + (it.task ? " / " + it.task : "")) + " (" + f0((v * pc) / 100) + " h)");
-            }
+      var lvPart = 0,
+        engPart = 0,
+        add = function (c, h) {
+          D[c][ci] += h;
+          if (c === "lv") {
+            lvPart += h;
+            D.lvInfo[ci].push(d + " – " + what + " (" + f0(h) + " h)");
           }
-        });
-        if (rem > 0) D.eng[ci] += (v * rem) / 100;
-      } else if (row) D[row][ci] += v;
+        };
+      hit.forEach(function (rule) {
+        if (rule.sp) {
+          // shared between rows by percentage; what is left stays in Eng'g
+          var rem = 100;
+          DMR_PRI.forEach(function (c) {
+            var pc = num(rule.sp[c]);
+            if (pc > 0) {
+              add(c, (v * pc) / 100);
+              rem -= pc;
+            }
+          });
+          if (rem > 0) engPart = Math.max(engPart, (v * rem) / 100);
+        } else if (rule.c) add(rule.c, v);
+      });
+      if (engPart) D.eng[ci] += engPart;
       else if (eng) D.eng[ci] += v;
+      lvPart = Math.min(lvPart, v);
       D.act[ci] += v - lvPart; // leave time is not worked time
     });
   });
@@ -7696,7 +7705,7 @@ function tmsMapBox() {
       return '<td class="in"><select data-rf="' + f + '" data-ri="' + i + '">' + tmsSelOpts(f, v || "", u) + "</select></td>";
     };
   h +=
-    '<p class="hint">Every project, task and description from the Lists tab is listed at the bottom; choose where it goes and it becomes a rule. To share one rule\'s hours between several rows, choose "Split between rows…" and type the percentages. Each row is a rule: leave Project…, Task… or Description… unselected to mean "any". Anything that fits a rule goes into "All goes into"; the rule with the most cells filled in wins (so Task = TM Concern Meeting + Description = Morning meeting beats Task = TM Concern Meeting alone). Entries that fit no rule count as Eng\'g when their project has a "Role in the project".</p>' +
+    '<p class="hint">Every project, task and description from the Lists tab is listed at the bottom; choose where it goes and it becomes a rule. To share one rule\'s hours between several rows, choose "Split between rows…" and type the percentages. If two rules fit the same entry equally well, its hours count in both rows. Each row is a rule: leave Project…, Task… or Description… unselected to mean "any". Anything that fits a rule goes into "All goes into"; the rule with the most cells filled in wins (so Task = TM Concern Meeting + Description = Morning meeting beats Task = TM Concern Meeting alone). Entries that fit no rule count as Eng\'g when their project has a "Role in the project".</p>' +
     '<p style="margin:6px 0"><b>Leave day types</b> (a day typed VL, SL ... counts in Leaves): ' +
     hol
       .map(function (n) {

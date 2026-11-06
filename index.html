@@ -7499,15 +7499,15 @@ function tmsLvDays() {
 }
 // the rule with the most filled-in cells that fits the entry wins (project + task + description beats just a task)
 function tmsRowOf(rules, it) {
-  var best = "",
+  var best = null,
     bn = 0;
   rules.forEach(function (r) {
     var n = (r.p ? 1 : 0) + (r.t ? 1 : 0) + (r.d ? 1 : 0);
-    if (!n || n <= bn || !r.c) return;
+    if (!n || n <= bn || !(r.c || r.sp)) return;
     if (r.p && r.p !== (it.project || "")) return;
     if (r.t && r.t !== (it.task || "")) return;
     if (r.d && r.d !== (it.desc || "")) return;
-    best = r.c;
+    best = r;
     bn = n;
   });
   return best;
@@ -7519,7 +7519,7 @@ function tmsDmrData(cols) {
         return 0;
       });
     },
-    D = { nom: z(), act: z(), eng: z(), ind: z(), ob: z(), mgmt: z(), brk: z(), lv: z() },
+    D = { nom: z(), act: z(), eng: z(), ind: z(), ob: z(), mgmt: z(), brk: z(), lv: z(), lvInfo: cols.map(function () { return []; }) },
     lvDays = tmsLvDays().map(function (k) {
       return String(k).toLowerCase();
     }),
@@ -7534,20 +7534,42 @@ function tmsDmrData(cols) {
       if (ci < 0) return;
       D.nom[ci] += nomOf(d); // the same figure as the Nominal row on the Tracker tab (leave and holiday days are already 0)
       var h = String((S.ts && S.ts[d] && S.ts[d].h) || "").trim().toLowerCase();
-      if (h && lvDays.indexOf(h) >= 0) D.lv[ci] += baseNom(d);
+      if (h && lvDays.indexOf(h) >= 0) {
+        var lh = baseNom(d);
+        D.lv[ci] += lh;
+        D.lvInfo[ci].push(d + " – " + String(S.ts[d].h).trim() + " (" + f0(lh) + " h)");
+      }
     });
   });
   S.items.forEach(function (it) {
-    var row = tmsRowOf(rules, it),
-      eng = !row && tmsRoleOf(it.project || "") !== "Others";
+    var rule = tmsRowOf(rules, it),
+      row = rule && !rule.sp ? rule.c : "",
+      eng = !rule && tmsRoleOf(it.project || "") !== "Others";
     Object.keys(it.log || {}).forEach(function (d) {
       var v = num(it.log[d]);
       if (!v || !tmsIn(d)) return;
       var ci = cols.indexOf(tmsPeriodKey(d));
       if (ci < 0 || tmsEx(tgOf(it, d) || "")) return;
-      if (row) D[row][ci] += v;
+      var lvPart = row === "lv" ? v : 0;
+      if (row === "lv") D.lvInfo[ci].push(d + " – " + ((it.project || "") + (it.task ? " / " + it.task : "")) + " (" + f0(v) + " h)");
+      if (rule && rule.sp) {
+        // the hours of this entry are shared between rows by percentage; what is left stays in Eng'g
+        var rem = 100;
+        DMR_PRI.forEach(function (c) {
+          var pc = num(rule.sp[c]);
+          if (pc > 0) {
+            D[c][ci] += (v * pc) / 100;
+            rem -= pc;
+            if (c === "lv") {
+              lvPart += (v * pc) / 100;
+              D.lvInfo[ci].push(d + " – " + ((it.project || "") + (it.task ? " / " + it.task : "")) + " (" + f0((v * pc) / 100) + " h)");
+            }
+          }
+        });
+        if (rem > 0) D.eng[ci] += (v * rem) / 100;
+      } else if (row) D[row][ci] += v;
       else if (eng) D.eng[ci] += v;
-      if (row !== "lv") D.act[ci] += v; // leave time is not worked time
+      D.act[ci] += v - lvPart; // leave time is not worked time
     });
   });
   return D;
@@ -7570,7 +7592,7 @@ function tmsDmrTable(cols) {
       })
       .join("") +
     "<th>Total<br>Man-hours</th></tr></thead><tbody>";
-  var line = function (name, a) {
+  var line = function (name, a, tips) {
     var t = 0;
     a.forEach(function (v) {
       t += v;
@@ -7580,11 +7602,14 @@ function tmsDmrTable(cols) {
       name +
       "</td>" +
       a
-        .map(function (v) {
-          return "<td>" + (v ? f0(v) : v === 0 ? "0" : "") + "</td>";
+        .map(function (v, i) {
+          var tip = tips && tips[i].length ? ' title="' + esc(tips[i].join("\n")) + '" style="cursor:help;text-decoration:underline dotted"' : "";
+          return "<td" + tip + ">" + (v ? f0(v) : v === 0 ? "0" : "") + "</td>";
         })
         .join("") +
-      "<td>" +
+      "<td" +
+      (tips && tips.some(function (x) { return x.length; }) ? ' title="' + esc([].concat.apply([], tips).join("\n")) + '" style="cursor:help;text-decoration:underline dotted"' : "") +
+      ">" +
       f0(t) +
       "</td></tr>";
   };
@@ -7592,7 +7617,7 @@ function tmsDmrTable(cols) {
   line("Actual", D.act);
   line("Eng'g", D.eng);
   DMR_ROWS.forEach(function (x) {
-    line(x[1] === "Management Concern" ? "Management Concern" : x[1], D[x[0]]);
+    line(x[1], D[x[0]], x[0] === "lv" ? D.lvInfo : null);
   });
   var dm = cols.map(function (k, i) {
       var den = D.nom[i] - D.brk[i]; // Nominal already leaves out leave days
@@ -7661,7 +7686,7 @@ function tmsMapBox() {
     catOpts = function (cur, any) {
       return (
         '<option value="">' + (any ? "All" : "(choose)") + "</option>" +
-        (any ? '<option value="-">Not assigned</option>' : "") +
+        (any ? '<option value="-">Not assigned</option>' : '<option value="__split">Split between rows…</option>') +
         DMR_ROWS.map(function (x) {
           return '<option value="' + x[0] + '"' + (cur === x[0] ? " selected" : "") + ">" + x[1] + "</option>";
         }).join("")
@@ -7671,7 +7696,7 @@ function tmsMapBox() {
       return '<td class="in"><select data-rf="' + f + '" data-ri="' + i + '">' + tmsSelOpts(f, v || "", u) + "</select></td>";
     };
   h +=
-    '<p class="hint">Every project, task and description from the Lists tab is listed at the bottom; choose where it goes and it becomes a rule. Each row is a rule: leave Project…, Task… or Description… unselected to mean "any". Anything that fits a rule goes into "All goes into"; the rule with the most cells filled in wins (so Task = TM Concern Meeting + Description = Morning meeting beats Task = TM Concern Meeting alone). Entries that fit no rule count as Eng\'g when their project has a "Role in the project".</p>' +
+    '<p class="hint">Every project, task and description from the Lists tab is listed at the bottom; choose where it goes and it becomes a rule. To share one rule\'s hours between several rows, choose "Split between rows…" and type the percentages. Each row is a rule: leave Project…, Task… or Description… unselected to mean "any". Anything that fits a rule goes into "All goes into"; the rule with the most cells filled in wins (so Task = TM Concern Meeting + Description = Morning meeting beats Task = TM Concern Meeting alone). Entries that fit no rule count as Eng\'g when their project has a "Role in the project".</p>' +
     '<p style="margin:6px 0"><b>Leave day types</b> (a day typed VL, SL ... counts in Leaves): ' +
     hol
       .map(function (n) {
@@ -7683,10 +7708,35 @@ function tmsMapBox() {
     '<div style="max-height:380px;overflow:auto"><table class="rep" id="tmsmaptab"><thead><tr><th>Project</th><th>Task</th><th>Description</th><th style="width:250px">All goes into</th><th style="width:36px"></th></tr>' +
     '<tr class="flt"><th colspan="3"><input type="search" data-mf="q" placeholder="Search project, task or description" value="' + esc(tmsMapF.q) + '"></th><th><select data-mf="c">' + catOpts(tmsMapF.c, true) + "</select></th><th></th></tr></thead><tbody>";
   rules.forEach(function (r, i) {
+    var nm = esc(((r.p || "") + " " + (r.t || "") + " " + (r.d || "")).toLowerCase()),
+      goes;
+    if (r.sp) {
+      var parts = [],
+        used = 0;
+      DMR_ROWS.forEach(function (x) {
+        var pc = num(r.sp[x[0]]);
+        if (pc > 0) {
+          parts.push(x[1] + " " + pc + "%");
+          used += pc;
+        }
+      });
+      if (used < 100) parts.push("Eng'g " + r2(100 - used) + "%");
+      goes = '<td class="in"><button data-spe="' + i + '" class="lnk" title="Edit the split">' + (tmsOpen["sp" + i] ? "▾ " : "▸ ") + esc(parts.join(" · ")) + "</button></td>";
+    } else goes = '<td class="in"><select data-rf="c" data-ri="' + i + '">' + catOpts(r.c, false) + "</select></td>";
     h +=
-      '<tr data-nm="' + esc(((r.p || "") + " " + (r.t || "") + " " + (r.d || "")).toLowerCase()) + '" data-cat="' + (r.c || "") + '">' +
-      cell("p", i, r.p) + cell("t", i, r.t) + cell("d", i, r.d) +
-      '<td class="in"><select data-rf="c" data-ri="' + i + '">' + catOpts(r.c, false) + '</select></td><td><button class="del" data-rdel="' + i + '" title="Remove this rule" aria-label="Remove rule">✕</button></td></tr>';
+      '<tr data-nm="' + nm + '" data-cat="' + (r.sp ? "split" : r.c || "") + '">' +
+      cell("p", i, r.p) + cell("t", i, r.t) + cell("d", i, r.d) + goes +
+      '<td><button class="del" data-rdel="' + i + '" title="Remove this rule" aria-label="Remove rule">✕</button></td></tr>';
+    if (r.sp && tmsOpen["sp" + i]) {
+      var used2 = 0;
+      h += '<tr data-nm="' + nm + '" data-cat="split"><td colspan="5" class="l" style="padding:8px 12px">Share the hours of this rule (% of the hours): ';
+      DMR_ROWS.forEach(function (x) {
+        var pc = num(r.sp[x[0]]);
+        used2 += pc > 0 ? pc : 0;
+        h += '<label style="margin-right:12px;white-space:nowrap">' + x[1] + ' <input type="number" min="0" max="100" step="any" style="width:70px" data-spi="' + i + '" data-spc="' + x[0] + '" value="' + (pc > 0 ? pc : "") + '"></label>';
+      });
+      h += '<span class="hint">Left in Eng\'g: ' + r2(Math.max(0, 100 - used2)) + '%</span> <button data-spoff="' + i + '">Back to one row</button></td></tr>';
+    }
   });
   // every project, task and description from the Lists tab is listed too; choose a row and it becomes a rule
   var cov = {};
@@ -7738,6 +7788,33 @@ function renderTmsSum(cur, list) {
   tmsMapFilter();
 }
 $("tmssum").addEventListener("click", function (e) {
+  var se = e.target.closest("[data-spe]"),
+    so = e.target.closest("[data-spoff]");
+  if (se) {
+    tmsOpen["sp" + se.dataset.spe] = !tmsOpen["sp" + se.dataset.spe];
+    tmsForce = true;
+    renderTms();
+    return;
+  }
+  if (so) {
+    var rr = tmsEditRules()[+so.dataset.spoff];
+    if (rr) {
+      var bc = "",
+        bp = 0;
+      Object.keys(rr.sp || {}).forEach(function (k) {
+        if (num(rr.sp[k]) > bp) {
+          bp = num(rr.sp[k]);
+          bc = k;
+        }
+      });
+      delete rr.sp;
+      rr.c = bc;
+    }
+    save();
+    tmsForce = true;
+    renderTms();
+    return;
+  }
   var ra = e.target.closest("[data-radd]"),
     rd = e.target.closest("[data-rdel]");
   if (ra) {
@@ -7750,6 +7827,9 @@ $("tmssum").addEventListener("click", function (e) {
   }
   if (rd) {
     tmsEditRules().splice(+rd.dataset.rdel, 1);
+    Object.keys(tmsOpen).forEach(function (k) {
+      if (k.slice(0, 2) === "sp") delete tmsOpen[k];
+    });
     save();
     tmsForce = true;
     renderTms();
@@ -7777,7 +7857,27 @@ $("tmssum").addEventListener("change", function (e) {
   }
   if (t.dataset && t.dataset.rf !== undefined) {
     var rl = tmsEditRules()[+t.dataset.ri];
-    if (rl) rl[t.dataset.rf] = t.value.trim();
+    if (rl && t.dataset.rf === "c" && t.value === "__split") {
+      rl.sp = rl.c ? JSON.parse('{"' + rl.c + '":100}') : {};
+      rl.c = "";
+      tmsOpen["sp" + t.dataset.ri] = true;
+    } else if (rl) rl[t.dataset.rf] = t.value.trim();
+    save();
+    tmsForce = true;
+    setTimeout(renderTms, 0);
+    return;
+  }
+  if (t.dataset && t.dataset.spi !== undefined) {
+    var sr = tmsEditRules()[+t.dataset.spi];
+    if (sr && sr.sp) {
+      var others = 0;
+      Object.keys(sr.sp).forEach(function (k) {
+        if (k !== t.dataset.spc) others += num(sr.sp[k]);
+      });
+      var nv = Math.max(0, Math.min(num(t.value), 100 - others));
+      if (nv > 0) sr.sp[t.dataset.spc] = nv;
+      else delete sr.sp[t.dataset.spc];
+    }
     save();
     tmsForce = true;
     setTimeout(renderTms, 0);
@@ -7785,8 +7885,12 @@ $("tmssum").addEventListener("change", function (e) {
   }
   if (t.dataset && t.dataset.rv !== undefined) {
     if (!t.value) return;
-    var nr = { p: "", t: "", d: "", c: t.value };
+    var nr = { p: "", t: "", d: "", c: t.value === "__split" ? "" : t.value };
     nr[t.dataset.rv] = t.dataset.rn;
+    if (t.value === "__split") {
+      nr.sp = {};
+      tmsOpen["sp" + tmsEditRules().length] = true;
+    }
     tmsEditRules().push(nr);
     save();
     tmsForce = true;

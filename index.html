@@ -6998,16 +6998,18 @@ function renderTms() {
         label +
         "Nominal hours in the duration: <b>" +
         f0(kk.nom) +
-        ' hrs</b> <span class="hint">· Occupancy = Actual MH ÷ nominal hours</span></caption>' +
+        ' hrs</b> <span class="hint">· Occupancy = Actual MH ÷ nominal hours · the Used total is the average of each row\'s Used %</span></caption>' +
         "<thead><tr><th>#</th><th>Work Scope</th><th>Plan MH</th><th>Actual MH</th><th>Remaining MH</th><th>Used</th><th>Occupancy<br>(Nominal)</th><th>Efficiency<br>&amp; Quality (%)</th><th>Status</th><th>Tracking</th><th></th></tr></thead><tbody>",
       plan = 0,
-      act = 0;
+      act = 0,
+      usedRows = [];
     kk.rows.forEach(function (r, i) {
       var a = kk.act[i],
         pl = kk.est[i],
         f = tmsFlag(pl, a, warn);
       plan += pl;
       act += a;
+      if (pl > 0) usedRows.push((a / pl) * 100);
       T +=
         "<tr><td>" +
         (i + 1) +
@@ -7081,7 +7083,14 @@ function renderTms() {
       '">' +
       f0(plan - act) +
       "</td><td>" +
-      (plan ? pc((act / plan) * 100, 0) : "–") +
+      (usedRows.length
+        ? pc(
+            usedRows.reduce(function (x, y) {
+              return x + y;
+            }, 0) / usedRows.length,
+            0,
+          )
+        : "–") +
       "</td><td>" +
       occ(plan, act) +
       '</td><td></td><td></td><td class="' +
@@ -7591,7 +7600,7 @@ function tmsDmrTable(cols) {
     h =
       '<caption><button class="lnk" data-tog="t|dmr">' +
       (open ? "▾" : "▸") +
-      ' <b>Monthly DMR</b></button> <span class="hint">· DMR % = Eng\'g ÷ (Nominal − Break); Nominal is the one on the Tracker tab, which already leaves out leave days · Total column: hours added up, DMR averaged over the months with hours · uses the Target ticks above</span></caption>';
+      ' <b>Monthly DMR</b></button> <span class="hint">· DMR % = Eng\'g ÷ (Nominal − Leaves − Break) · Total column: hours added up, DMR averaged over the months with hours · uses the Target ticks above</span></caption>';
   if (!open) return h;
   h +=
     "<thead><tr><th>Category</th>" +
@@ -7629,7 +7638,7 @@ function tmsDmrTable(cols) {
     line(x[1], D[x[0]], x[0] === "lv" ? D.lvInfo : null);
   });
   var dm = cols.map(function (k, i) {
-      var den = D.nom[i] - D.brk[i]; // Nominal already leaves out leave days
+      var den = D.nom[i] - D.lv[i] - D.brk[i]; // as in the reference sheet: Nominal less Leaves less Break
       return den > 0 && (D.act[i] || D.eng[i]) ? (D.eng[i] / den) * 100 : null;
     }),
     n = 0,
